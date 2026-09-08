@@ -4,16 +4,64 @@ Uses speechbrain/spkrec-ecapa-voxceleb for 192-dim embeddings
 """
 
 import io
-import numpy as np
+import torch
+import torchaudio
+from speechbrain.inference.speaker import EncoderClassifier
 
-# Phase 1: Stub implementation with mocked returns
-# Phase 2: Uncomment real model loading below
+# Load model once at module import (not per-request)
+MODEL = EncoderClassifier.from_hparams(
+    source="speechbrain/spkrec-ecapa-voxceleb",
+    savedir="pretrained_models/spkrec-ecapa-voxceleb",
+    run_opts={"device": "cpu"}  # Use CPU for demo; change to "cuda" if GPU available
+)
 
-# from speechbrain.inference.speaker import SpeakerRecognition
-# MODEL = SpeakerRecognition.from_hparams(
-#     source="speechbrain/spkrec-ecapa-voxceleb",
-#     savedir="pretrained_models/spkrec-ecapa-voxceleb"
-# )
+
+def _load_audio(audio_bytes: bytes) -> torch.Tensor:
+    """
+    Load audio bytes and convert to 16kHz mono waveform.
+
+    Args:
+        audio_bytes: Raw WAV file bytes
+
+    Returns:
+        Tensor of shape (1, num_samples) at 16kHz
+    """
+    waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
+
+    # Convert to mono if stereo
+    if waveform.shape[0] > 1:
+        waveform = waveform.mean(dim=0, keepdim=True)
+
+    # Resample to 16kHz if needed
+    if sample_rate != 16000:
+        resampler = torchaudio.transforms.Resample(sample_rate, 16000)
+        waveform = resampler(waveform)
+
+    return waveform
+
+
+def _cosine_similarity(embedding1: torch.Tensor, embedding2: torch.Tensor) -> float:
+    """
+    Compute cosine similarity between two embeddings.
+
+    Returns:
+        Similarity score normalized to 0-1 range
+    """
+    # Ensure 1D tensors
+    e1 = embedding1.flatten()
+    e2 = embedding2.flatten()
+
+    # Cosine similarity: ranges from -1 to 1
+    cos_sim = torch.nn.functional.cosine_similarity(
+        e1.unsqueeze(0),
+        e2.unsqueeze(0)
+    ).item()
+
+    # Normalize to 0-1 range: (cos_sim + 1) / 2
+    # -1 -> 0, 0 -> 0.5, 1 -> 1
+    normalized_score = (cos_sim + 1) / 2
+
+    return normalized_score
 
 
 def enroll_speaker(audio_bytes: bytes) -> dict:
@@ -26,19 +74,16 @@ def enroll_speaker(audio_bytes: bytes) -> dict:
     Returns:
         {"embedding": list[float]}  # 192-dim
     """
-    # === STUB (Phase 1) ===
-    # Return random 192-dim embedding for testing
-    embedding = np.random.randn(192).tolist()
-    return {"embedding": embedding}
+    waveform = _load_audio(audio_bytes)
 
-    # === REAL (Phase 2) ===
-    # import torchaudio
-    # waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
-    # if sample_rate != 16000:
-    #     resampler = torchaudio.transforms.Resample(sample_rate, 16000)
-    #     waveform = resampler(waveform)
-    # embedding = MODEL.encode_batch(waveform).squeeze().tolist()
-    # return {"embedding": embedding}
+    # Extract embedding using ECAPA-TDNN
+    # encode_batch expects (batch, time) tensor
+    embedding = MODEL.encode_batch(waveform)
+
+    # Squeeze to 1D: (1, 1, 192) -> (192,)
+    embedding = embedding.squeeze()
+
+    return {"embedding": embedding.tolist()}
 
 
 def verify_speaker(audio_bytes: bytes, stored_embedding: list[float]) -> dict:
@@ -51,29 +96,20 @@ def verify_speaker(audio_bytes: bytes, stored_embedding: list[float]) -> dict:
 
     Returns:
         {"score": float, "embedding": list[float]}
-        score: cosine similarity 0-1
+        score: cosine similarity 0-1 (higher = more similar)
     """
-    # === STUB (Phase 1) ===
-    # Return random score and embedding for testing
-    new_embedding = np.random.randn(192).tolist()
-    score = np.random.uniform(0.5, 1.0)  # Simulate mostly positive matches
-    return {"score": float(score), "embedding": new_embedding}
+    waveform = _load_audio(audio_bytes)
 
-    # === REAL (Phase 2) ===
-    # import torchaudio
-    # import torch
-    # waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
-    # if sample_rate != 16000:
-    #     resampler = torchaudio.transforms.Resample(sample_rate, 16000)
-    #     waveform = resampler(waveform)
-    # new_embedding = MODEL.encode_batch(waveform).squeeze()
-    #
-    # # Cosine similarity
-    # stored = torch.tensor(stored_embedding)
-    # score = torch.nn.functional.cosine_similarity(
-    #     new_embedding.unsqueeze(0),
-    #     stored.unsqueeze(0)
-    # ).item()
-    # score = (score + 1) / 2  # Normalize to 0-1
-    #
-    # return {"score": float(score), "embedding": new_embedding.tolist()}
+    # Extract embedding from new audio
+    new_embedding = MODEL.encode_batch(waveform).squeeze()
+
+    # Convert stored embedding to tensor
+    stored_tensor = torch.tensor(stored_embedding)
+
+    # Compute similarity score
+    score = _cosine_similarity(new_embedding, stored_tensor)
+
+    return {
+        "score": float(score),
+        "embedding": new_embedding.tolist()
+    }
