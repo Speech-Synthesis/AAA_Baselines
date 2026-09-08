@@ -5,7 +5,9 @@ Uses speechbrain/spkrec-ecapa-voxceleb for 192-dim embeddings
 
 import io
 import torch
-import torchaudio
+import soundfile as sf
+import numpy as np
+from scipy import signal
 from speechbrain.inference.speaker import EncoderClassifier
 
 # Load model once at module import (not per-request)
@@ -26,16 +28,20 @@ def _load_audio(audio_bytes: bytes) -> torch.Tensor:
     Returns:
         Tensor of shape (1, num_samples) at 16kHz
     """
-    waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
+    # Use soundfile to read audio (no FFmpeg dependency)
+    audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
 
     # Convert to mono if stereo
-    if waveform.shape[0] > 1:
-        waveform = waveform.mean(dim=0, keepdim=True)
+    if len(audio_data.shape) > 1:
+        audio_data = np.mean(audio_data, axis=1)
 
     # Resample to 16kHz if needed
     if sample_rate != 16000:
-        resampler = torchaudio.transforms.Resample(sample_rate, 16000)
-        waveform = resampler(waveform)
+        num_samples = int(len(audio_data) * 16000 / sample_rate)
+        audio_data = signal.resample(audio_data, num_samples)
+
+    # Convert to tensor with shape (1, num_samples)
+    waveform = torch.tensor(audio_data, dtype=torch.float32).unsqueeze(0)
 
     return waveform
 
