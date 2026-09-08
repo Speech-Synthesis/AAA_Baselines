@@ -9,12 +9,16 @@ import soundfile as sf
 import numpy as np
 from scipy import signal
 from speechbrain.inference.speaker import EncoderClassifier
+from speechbrain.utils.fetching import LocalStrategy
 
 # Load model once at module import (not per-request)
+# local_strategy=COPY avoids symlinking into savedir, which fails on Windows
+# without admin rights or Developer Mode enabled.
 MODEL = EncoderClassifier.from_hparams(
     source="speechbrain/spkrec-ecapa-voxceleb",
     savedir="pretrained_models/spkrec-ecapa-voxceleb",
-    run_opts={"device": "cpu"}  # Use CPU for demo; change to "cuda" if GPU available
+    run_opts={"device": "cpu"},  # Use CPU for demo; change to "cuda" if GPU available
+    local_strategy=LocalStrategy.COPY
 )
 
 
