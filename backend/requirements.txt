@@ -1,0 +1,29 @@
+# AAA Engine Backend Dependencies
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+
+# ML/Audio - Layer 1 (Speaker Verification)
+speechbrain>=0.5.16
+torchaudio>=2.1.0
+
+# ML/Audio - Layer 2 (Deepfake Detection)
+transformers>=4.35.0
+torch>=2.1.0
+
+# Audio processing
+librosa>=0.10.1
+soundfile>=0.12.1
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+numpy>=1.24.0
