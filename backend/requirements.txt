@@ -8,24 +8,22 @@ python-multipart>=0.0.6
 # Database
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.9
-asyncpg>=0.29.0
 
-# ML/Audio - Layer 1 (Speaker Verification)
-speechbrain>=1.0.0
+# ML Core
 torch>=2.1.0
-torchaudio>=2.1.0
+numpy>=1.24.0
 
-# ML/Audio - Layer 2 (Deepfake Detection)
+# Layer 1 - Speaker Verification (ECAPA-TDNN)
+speechbrain>=1.0.0
+
+# Layer 2 - Deepfake Detection (Wav2Vec2)
 transformers>=4.35.0
 
-# Audio processing
+# Audio processing (using soundfile - no FFmpeg needed)
 soundfile>=0.12.1
 scipy>=1.10.0
-librosa>=0.10.1
 
 # Utilities
 python-dotenv>=1.0.0
 pydantic>=2.5.0
-pydantic-settings>=2.1.0
-numpy>=1.24.0
 huggingface-hub>=0.20.0
