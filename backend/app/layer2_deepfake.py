@@ -6,7 +6,9 @@ Phase 1: Pretrained baseline (no training)
 
 import io
 import torch
-import torchaudio
+import soundfile as sf
+import numpy as np
+from scipy import signal
 from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor
 from typing import Optional
 
@@ -64,21 +66,22 @@ def detect_spoof(audio_bytes: bytes) -> dict:
     _load_model()
     
     try:
-        # Load audio from bytes
-        waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
-        
+        # Load audio from bytes (soundfile avoids torchaudio's torchcodec/FFmpeg
+        # dependency, which isn't available on this machine)
+        audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+
+        # Convert to mono if stereo
+        if len(audio_data.shape) > 1:
+            audio_data = np.mean(audio_data, axis=1)
+
         # Resample if necessary
         if sample_rate != 16000:
-            resampler = torchaudio.transforms.Resample(sample_rate, 16000)
-            waveform = resampler(waveform)
-        
-        # Convert to mono if stereo
-        if waveform.shape[0] > 1:
-            waveform = waveform.mean(dim=0, keepdim=True)
-        
+            num_samples = int(len(audio_data) * 16000 / sample_rate)
+            audio_data = signal.resample(audio_data, num_samples)
+
         # Extract features
         inputs = _FEATURE_EXTRACTOR(
-            waveform.squeeze().numpy(),
+            audio_data,
             sampling_rate=16000,
             return_tensors="pt",
             padding=True
