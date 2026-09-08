@@ -114,8 +114,8 @@ def detect_spoof(audio_bytes: bytes) -> dict:
             predicted_class = torch.argmax(probs, dim=-1).item()
             confidence = probs[0, predicted_class].item()
 
-        # Class mapping: 0=bonafide, 1=spoof (standard for ASVspoof models)
-        label = "bonafide" if predicted_class == 0 else "spoof"
+        # Class mapping for HyperMoon model: 0=spoof, 1=bonafide
+        label = "spoof" if predicted_class == 0 else "bonafide"
 
         return {
             "label": label,
