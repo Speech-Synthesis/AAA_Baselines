@@ -8,6 +8,7 @@ export function EnrollPage({ activeUser, onComplete }) {
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
+  const [enrollmentComplete, setEnrollmentComplete] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -62,9 +63,11 @@ export function EnrollPage({ activeUser, onComplete }) {
         setCurrentStep((prev) => prev + 1);
         setStatusMsg({
           type: 'success',
-          text: `Voice Sample ${currentStep} enrolled. Total samples: ${newCount}. Speak next sample.`
+          text: `Voice Sample ${currentStep} enrolled. Total samples: ${newCount}. Record next sample.`
         });
       } else {
+        // Sample 3 complete - enrollment done
+        setEnrollmentComplete(true);
         setStatusMsg({
           type: 'success',
           text: `Voiceprint enrollment complete. Built 192-dim embedding with ${newCount} total samples.`
@@ -162,7 +165,7 @@ export function EnrollPage({ activeUser, onComplete }) {
               }}
             >
               <span>{statusMsg.text}</span>
-              {currentStep === 3 && onComplete && (
+              {enrollmentComplete && onComplete && (
                 <button className="btn-saas-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={onComplete}>
                   Proceed to Authenticate
                 </button>
