@@ -38,7 +38,7 @@ app.add_middleware(
 
 # Thresholds (tune in Phase 2)
 L2_SPOOF_THRESHOLD = 0.5  # Reject if spoof confidence > this
-L1_SIMILARITY_THRESHOLD = 0.7  # Reject if speaker similarity < this
+L1_SIMILARITY_THRESHOLD = 0.65  # Reject if speaker similarity < this
 
 
 # === Request/Response Models ===
