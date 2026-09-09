@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { registerUser } from '../api';
 
-export function RegisterPage({ activeUser, setActiveUser, registeredUsers, setRegisteredUsers, onComplete }) {
+export function RegisterPage({ activeUser, setActiveUser, registeredUsers, setRegisteredUsers, refreshUsers, onComplete }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,14 +19,13 @@ export function RegisterPage({ activeUser, setActiveUser, registeredUsers, setRe
 
     try {
       const res = await registerUser(name, email);
-      const newUser = { id: res.user_id, name, email };
-      
-      setActiveUser(newUser);
-      setRegisteredUsers((prev) => [newUser, ...prev.filter(u => u.id !== newUser.id)]);
       setStatusMsg({ type: 'success', text: `Identity registered successfully! Assigned UUID: ${res.user_id}` });
-      
+
       setName('');
       setEmail('');
+
+      // Refresh users list from database
+      if (refreshUsers) await refreshUsers();
 
       if (onComplete) setTimeout(() => onComplete(), 1200);
     } catch (err) {

@@ -5,7 +5,7 @@ import { EnrollPage } from './components/EnrollPage';
 import { LoginPage } from './components/LoginPage';
 import { VerifyPage } from './components/VerifyPage';
 import { DashboardPage } from './components/DashboardPage';
-import { checkServerHealth } from './api';
+import { checkServerHealth, getAllUsers } from './api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('register');
@@ -14,9 +14,18 @@ function App() {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [activeUser, setActiveUser] = useState(null);
 
+  // Load users from database on startup
+  const loadUsers = async () => {
+    const users = await getAllUsers();
+    setRegisteredUsers(users);
+    if (users.length > 0 && !activeUser) {
+      setActiveUser(users[0]);
+    }
+  };
+
   useEffect(() => {
-    // Check server health
     checkServerHealth().then(setIsServerLive);
+    loadUsers();
   }, []);
 
   return (
@@ -44,6 +53,7 @@ function App() {
             setActiveUser={setActiveUser}
             registeredUsers={registeredUsers}
             setRegisteredUsers={setRegisteredUsers}
+            refreshUsers={loadUsers}
             onComplete={() => setActiveTab('enroll')}
           />
         )}

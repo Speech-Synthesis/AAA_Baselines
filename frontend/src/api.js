@@ -19,6 +19,17 @@ export const checkServerHealth = async () => {
   }
 };
 
+// Get all registered users
+export const getAllUsers = async () => {
+  try {
+    const res = await client.get('/users');
+    return res.data;
+  } catch (err) {
+    console.error('Get users error:', err);
+    return [];
+  }
+};
+
 // 1. Register User
 export const registerUser = async (name, email) => {
   try {

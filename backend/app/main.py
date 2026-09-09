@@ -91,11 +91,37 @@ class AuthLogResponse(BaseModel):
     reason: Optional[str] = None
 
 
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    created_at: datetime
+    has_voiceprint: bool = False
+
+
 # === Routes ===
 
 @app.get("/")
 async def root():
     return {"message": "AAA Engine API", "status": "running"}
+
+
+@app.get("/users", response_model=list[UserResponse])
+async def get_all_users(db: Session = Depends(get_db)):
+    """Get all registered users."""
+    users = db.query(User).order_by(User.created_at.desc()).all()
+
+    result = []
+    for user in users:
+        voiceprint = db.query(Voiceprint).filter(Voiceprint.user_id == user.id).first()
+        result.append(UserResponse(
+            id=str(user.id),
+            name=user.name,
+            email=user.email,
+            created_at=user.created_at,
+            has_voiceprint=voiceprint is not None
+        ))
+    return result
 
 
 @app.post("/auth/register", response_model=RegisterResponse)
