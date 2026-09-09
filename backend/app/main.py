@@ -285,6 +285,11 @@ async def verify(
             l1_score=l1_score
         )
 
+    # Mark challenge as used in database
+    challenge = db.query(Challenge).filter(Challenge.token == token).first()
+    if challenge:
+        challenge.used = True
+
     # === SUCCESS: Update voiceprint with EMA ===
     updated_embedding = update_voiceprint(voiceprint.embedding, new_embedding)
     voiceprint.embedding = updated_embedding
@@ -294,6 +299,7 @@ async def verify(
     # Log success
     log = AuthLog(
         user_id=uuid.UUID(user_id),
+        challenge_id=challenge.id if challenge else None,
         l2_label=l2_label,
         l2_confidence=l2_confidence,
         l1_score=l1_score,
