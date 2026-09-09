@@ -53,7 +53,9 @@ def _cosine_similarity(embedding1: torch.Tensor, embedding2: torch.Tensor) -> fl
     Compute cosine similarity between two embeddings.
 
     Returns:
-        Similarity score normalized to 0-1 range
+        Similarity score in range [0, 1] (clamped)
+        Same speaker: typically 0.75-0.95
+        Different speaker: typically 0.3-0.6
     """
     # Ensure 1D tensors
     e1 = embedding1.flatten()
@@ -65,11 +67,9 @@ def _cosine_similarity(embedding1: torch.Tensor, embedding2: torch.Tensor) -> fl
         e2.unsqueeze(0)
     ).item()
 
-    # Normalize to 0-1 range: (cos_sim + 1) / 2
-    # -1 -> 0, 0 -> 0.5, 1 -> 1
-    normalized_score = (cos_sim + 1) / 2
-
-    return normalized_score
+    # Clamp to [0, 1] - negative similarity means very different, treat as 0
+    # Don't use (cos_sim + 1) / 2 as it inflates scores for different speakers
+    return max(0.0, cos_sim)
 
 
 def enroll_speaker(audio_bytes: bytes) -> dict:
