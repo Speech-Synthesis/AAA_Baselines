@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVoiceprintHistory, getMockStore } from '../api';
+import { getVoiceprintHistory, getAuthLogs } from '../api';
 
 export function DashboardPage({ activeUser }) {
   const [history, setHistory] = useState([]);
@@ -8,8 +8,11 @@ export function DashboardPage({ activeUser }) {
   useEffect(() => {
     if (activeUser) {
       getVoiceprintHistory(activeUser.id).then(setHistory);
+      getAuthLogs(activeUser.id).then(setLogs);
+    } else {
+      setHistory([]);
+      setLogs([]);
     }
-    setLogs(getMockStore().logs);
   }, [activeUser]);
 
   return (

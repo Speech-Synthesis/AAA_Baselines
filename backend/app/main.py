@@ -79,6 +79,18 @@ class VoiceprintHistory(BaseModel):
     sample_count: int
 
 
+class AuthLogResponse(BaseModel):
+    id: str
+    user_id: str
+    l2_label: Optional[str]
+    l2_confidence: float
+    l1_score: float
+    result: str
+    layer_blocked: Optional[int]
+    created_at: datetime
+    reason: Optional[str] = None
+
+
 # === Routes ===
 
 @app.get("/")
@@ -335,4 +347,43 @@ async def voiceprint_history(user_id: str, db: Session = Depends(get_db)):
     return [
         VoiceprintHistory(updated_at=vp.updated_at, sample_count=vp.sample_count)
         for vp in voiceprints
+    ]
+
+
+@app.get("/users/{user_id}/auth-logs", response_model=list[AuthLogResponse])
+async def get_auth_logs(user_id: str, db: Session = Depends(get_db)):
+    """Get authentication logs for a user."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    logs = db.query(AuthLog).filter(
+        AuthLog.user_id == user_id
+    ).order_by(AuthLog.created_at.desc()).limit(50).all()
+
+    # Map layer_blocked to reason
+    def get_reason(log):
+        if log.result == "ACCEPT":
+            return "Authentication successful"
+        if log.layer_blocked == 1:
+            return "Speaker verification failed"
+        if log.layer_blocked == 2:
+            return "Deepfake/spoof detected"
+        if log.layer_blocked == 3:
+            return "Invalid or expired token"
+        return "Unknown"
+
+    return [
+        AuthLogResponse(
+            id=str(log.id),
+            user_id=str(log.user_id),
+            l2_label=log.l2_label,
+            l2_confidence=log.l2_confidence or 0.0,
+            l1_score=log.l1_score or 0.0,
+            result=log.result,
+            layer_blocked=log.layer_blocked,
+            created_at=log.created_at,
+            reason=get_reason(log)
+        )
+        for log in logs
     ]

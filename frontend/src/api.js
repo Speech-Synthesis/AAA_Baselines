@@ -143,17 +143,25 @@ export const verifyVoice = async (userId, token, audioBlob, forceSpoof = false) 
   }
 };
 
-// 5. Get Voiceprint History / Logs
+// 5. Get Voiceprint History
 export const getVoiceprintHistory = async (userId) => {
   try {
     const res = await client.get(`/users/${userId}/voiceprint-history`);
     return res.data;
   } catch (err) {
-    const vp = mockStore.voiceprints[userId];
-    if (vp) {
-      return [{ updated_at: vp.updated_at, sample_count: vp.sample_count }];
-    }
-    return [{ updated_at: new Date().toISOString(), sample_count: 3 }];
+    console.error('Voiceprint history error:', err);
+    return [];
+  }
+};
+
+// 6. Get Auth Logs (real data from backend)
+export const getAuthLogs = async (userId) => {
+  try {
+    const res = await client.get(`/users/${userId}/auth-logs`);
+    return res.data;
+  } catch (err) {
+    console.error('Auth logs error:', err);
+    return [];
   }
 };
 
