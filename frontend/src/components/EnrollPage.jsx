@@ -81,7 +81,7 @@ export function EnrollPage({ activeUser, onComplete }) {
     <div className="saas-card">
       <div className="card-title-lg">Speaker Voiceprint Enrollment</div>
       <div className="card-subtitle-text">
-        Record 3 audio samples (min 3s) to extract ECAPA-TDNN 192-dim acoustic embeddings (Endpoint: <code>POST /auth/enroll</code>)
+        Record 3 audio samples (min 5s) to extract ECAPA-TDNN 192-dim acoustic embeddings (Endpoint: <code>POST /auth/enroll</code>)
       </div>
 
       {!activeUser ? (
@@ -141,7 +141,7 @@ export function EnrollPage({ activeUser, onComplete }) {
                 ? 'Stop Recording & Upload Sample'
                 : loading
                 ? 'Extracting 192-dim Embedding...'
-                : `Record Voice Sample ${currentStep} of 3 (Min 3 Seconds)`}
+                : `Record Voice Sample ${currentStep} of 3 (Min 5 Seconds)`}
             </button>
           </div>
 
