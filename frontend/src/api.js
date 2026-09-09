@@ -3,10 +3,10 @@ import axios from 'axios';
 // API base URL (Backend FastAPI server)
 const API_BASE = 'http://localhost:8000';
 
-// Configure Axios client with timeout
+// Configure Axios client with timeout (60s for model loading on first request)
 const client = axios.create({
   baseURL: API_BASE,
-  timeout: 8000,
+  timeout: 60000,
 });
 
 // Local in-memory mock store for offline/demo mode
@@ -74,29 +74,21 @@ export const registerUser = async (name, email) => {
   }
 };
 
-// 2. Enroll Voice Sample
+// 2. Enroll Voice Sample (NO MOCK - always use real backend)
 export const enrollVoice = async (userId, audioBlob) => {
-  try {
-    const formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('audio', audioBlob, 'enrollment.wav');
+  const formData = new FormData();
+  formData.append('user_id', userId);
+  formData.append('audio', audioBlob, 'enrollment.wav');
 
+  try {
     const res = await client.post('/auth/enroll', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return res.data;
   } catch (err) {
+    console.error('Enroll API error:', err);
     if (err.response?.data?.detail) throw new Error(err.response.data.detail);
-    
-    // Fallback Mock Execution
-    console.warn('Backend unreachable. Executing enroll in Mock Mode.');
-    const current = mockStore.voiceprints[userId] || { sample_count: 0 };
-    const updated = {
-      sample_count: current.sample_count + 1,
-      updated_at: new Date().toISOString()
-    };
-    mockStore.voiceprints[userId] = updated;
-    return { status: 'enrolled', sample_count: updated.sample_count, is_mock: true };
+    throw new Error(err.message || 'Backend connection failed - check if server is running');
   }
 };
 
@@ -132,62 +124,22 @@ export const getChallenge = async (userId) => {
   }
 };
 
-// 4. Verify Voice Response
+// 4. Verify Voice Response (NO MOCK - always use real backend)
 export const verifyVoice = async (userId, token, audioBlob, forceSpoof = false) => {
-  try {
-    const formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('token', token);
-    formData.append('audio', audioBlob, 'verify.wav');
+  const formData = new FormData();
+  formData.append('user_id', userId);
+  formData.append('token', token);
+  formData.append('audio', audioBlob, 'verify.wav');
 
+  try {
     const res = await client.post('/auth/verify', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return res.data;
   } catch (err) {
+    console.error('Verify API error:', err);
     if (err.response?.data?.detail) throw new Error(err.response.data.detail);
-    
-    // Fallback Mock Execution
-    console.warn('Backend unreachable. Executing verifyVoice in Mock Mode.');
-    const sessionId = `sess-${Math.random().toString(36).substring(2, 10)}`;
-    const isSuccess = !forceSpoof && Math.random() > 0.15; // 85% accept rate unless forced
-
-    const mockResponse = isSuccess
-      ? {
-          result: 'ACCEPT',
-          confidence: 0.958,
-          layer_blocked: null,
-          session_id: sessionId,
-          reason: 'Authentication successful (Voice & Challenge verified)',
-          l2_label: 'bonafide',
-          l2_confidence: 0.991,
-          l1_score: 0.958
-        }
-      : {
-          result: 'REJECT',
-          confidence: forceSpoof ? 0.965 : 0.421,
-          layer_blocked: forceSpoof ? 2 : 1,
-          session_id: sessionId,
-          reason: forceSpoof ? 'Deepfake/spoof detected at Layer 2' : 'Speaker verification failed at Layer 1',
-          l2_label: forceSpoof ? 'spoof' : 'bonafide',
-          l2_confidence: forceSpoof ? 0.965 : 0.920,
-          l1_score: forceSpoof ? 0.0 : 0.421
-        };
-
-    // Update mock logs & voiceprint
-    mockStore.logs.unshift({
-      id: `log-${Date.now()}`,
-      user_id: userId,
-      ...mockResponse,
-      created_at: new Date().toISOString()
-    });
-
-    if (isSuccess && mockStore.voiceprints[userId]) {
-      mockStore.voiceprints[userId].sample_count += 1;
-      mockStore.voiceprints[userId].updated_at = new Date().toISOString();
-    }
-
-    return { ...mockResponse, is_mock: true };
+    throw new Error(err.message || 'Backend connection failed - check if server is running');
   }
 };
 
