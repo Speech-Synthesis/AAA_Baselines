@@ -85,7 +85,7 @@ export function DashboardPage({ activeUser }) {
                   </div>
 
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--primary-blue)' }}>
-                    {new Date(h.updated_at).toLocaleString()}
+                    {new Date(h.updated_at).toLocaleDateString('en-GB')} {new Date(h.updated_at).toLocaleTimeString()}
                   </div>
                 </div>
               ))}

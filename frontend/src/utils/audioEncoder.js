@@ -1,29 +1,40 @@
 /**
  * Web Audio API PCM WAV Converter
  * Converts browser MediaRecorder Blobs (WebM/Opus) into valid 16kHz Mono RIFF WAV Blobs
- * Ensures 100% backend compatibility with soundfile / SpeechBrain / PyTorch.
+ * Uses OfflineAudioContext for proper resampling
  */
 
 export async function convertBlobTo16kHzWav(webmBlob) {
   try {
     const arrayBuffer = await webmBlob.arrayBuffer();
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-    // Convert to 16kHz Mono PCM
-    const numberOfChannels = 1;
-    const length = audioBuffer.length;
-    const sampleRate = 16000;
-    const pcmData = audioBuffer.getChannelData(0); // Channel 0 mono
+    // First decode at native sample rate
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    audioCtx.close();
+
+    // Resample to 16kHz using OfflineAudioContext
+    const targetSampleRate = 16000;
+    const duration = audioBuffer.duration;
+    const offlineCtx = new OfflineAudioContext(1, Math.ceil(duration * targetSampleRate), targetSampleRate);
+
+    // Create buffer source
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineCtx.destination);
+    source.start(0);
+
+    // Render resampled audio
+    const resampledBuffer = await offlineCtx.startRendering();
+    const pcmData = resampledBuffer.getChannelData(0);
 
     // Encode PCM to WAV
-    const wavBuffer = encodeWAV(pcmData, sampleRate, numberOfChannels);
-    audioCtx.close();
+    const wavBuffer = encodeWAV(pcmData, targetSampleRate, 1);
 
     return new Blob([wavBuffer], { type: 'audio/wav' });
   } catch (err) {
-    console.warn('WAV conversion fallback: submitting raw blob', err);
-    return webmBlob;
+    console.error('WAV conversion failed:', err);
+    throw err;
   }
 }
 
