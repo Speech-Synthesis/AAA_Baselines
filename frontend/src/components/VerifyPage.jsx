@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getChallenge, verifyVoice } from '../api';
+import { convertBlobTo16kHzWav } from '../utils/audioEncoder';
 
-export function VerifyPage({ activeUser }) {
+export function VerifyPage({ activeUser, onComplete }) {
   const [challenge, setChallenge] = useState(null);
   const [loadingChallenge, setLoadingChallenge] = useState(false);
   const [timeLeft, setTimeLeft] = useState(90);
@@ -38,7 +39,7 @@ export function VerifyPage({ activeUser }) {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            setStatusMsg({ type: 'error', text: '⏱️ Challenge token expired (90s TTL reached). Request a new challenge.' });
+            setStatusMsg({ type: 'error', text: 'Challenge token expired (90s TTL limit reached). Please request a fresh challenge.' });
             setChallenge(null);
             return 0;
           }
@@ -70,8 +71,10 @@ export function VerifyPage({ activeUser }) {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        await handleVerifySubmit(audioBlob);
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Convert to 16kHz Mono WAV Blob for 100% backend compatibility
+        const wavBlob = await convertBlobTo16kHzWav(rawBlob);
+        await handleVerifySubmit(wavBlob);
       };
 
       recorder.start();
@@ -79,7 +82,7 @@ export function VerifyPage({ activeUser }) {
       setIsRecording(true);
       setStatusMsg(null);
     } catch (err) {
-      setStatusMsg({ type: 'error', text: 'Microphone access denied' });
+      setStatusMsg({ type: 'error', text: 'Microphone access denied or unavailable' });
     }
   };
 
@@ -99,94 +102,92 @@ export function VerifyPage({ activeUser }) {
       setVerifyResult(res);
       setChallenge(null);
     } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message || 'Verification endpoint failed' });
+      setStatusMsg({ type: 'error', text: err.message || 'Verification pipeline failed' });
     } finally {
       setVerifying(false);
     }
   };
 
   return (
-    <div className="glass-card">
-      <div className="card-title">🔐 Adaptive Verification Protocol</div>
-      <div className="card-subtitle">
+    <div className="saas-card">
+      <div className="card-title-lg">Adaptive Authentication Protocol</div>
+      <div className="card-subtitle-text">
         Dynamic Challenge-Response (Layer 3) → Deepfake Detection (Layer 2) → Speaker Verification (Layer 1)
       </div>
 
       {!activeUser ? (
-        <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--warning)', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
-          ⚠️ No active user selected. Please go to the <strong>Register</strong> or <strong>Switch User</strong> tab.
+        <div style={{ padding: '1.75rem', textAlign: 'center', color: 'var(--warning-amber)', background: '#fffbeb', borderRadius: 'var(--radius-lg)', border: '1px solid #fde68a', fontWeight: 600 }}>
+          No active user selected. Please complete Register first.
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              Target Identity: <strong>{activeUser.name}</strong> ({activeUser.email})
+              Target Identity: <strong style={{ color: 'var(--text-dark)' }}>{activeUser.name}</strong> ({activeUser.email})
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: forceSpoof ? 'var(--danger)' : 'var(--text-muted)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: forceSpoof ? 'var(--danger-red)' : 'var(--text-muted)', fontWeight: 600 }}>
               <input
                 type="checkbox"
                 checked={forceSpoof}
                 onChange={(e) => setForceSpoof(e.target.checked)}
+                style={{ accentColor: 'var(--danger-red)', width: '16px', height: '16px' }}
               />
               Simulate Deepfake Attack (Test Layer 2)
             </label>
           </div>
 
           {!challenge ? (
-            <button className="btn-primary" onClick={fetchNewChallenge} disabled={loadingChallenge}>
-              {loadingChallenge ? 'Generating HMAC Challenge...' : '⚡ Get Challenge Phrase (90s TTL)'}
+            <button className="btn-saas-primary" onClick={fetchNewChallenge} disabled={loadingChallenge}>
+              {loadingChallenge ? 'Signing HMAC-SHA256 Token...' : 'Request Challenge Phrase (90s TTL)'}
             </button>
           ) : (
             <div>
-              <div className="challenge-box">
-                <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--primary)', fontWeight: 700, marginBottom: '6px' }}>
-                  CHALLENGE PHRASE TO SPEAK:
+              <div className="light-challenge-hero">
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--primary-blue)', fontWeight: 700 }}>
+                  CHALLENGE PHRASE TO SPEAK
                 </div>
-                <div className="challenge-text">"{challenge.phrase}"</div>
+                <div className="challenge-text-display">"{challenge.phrase}"</div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginTop: '10px' }}>
-                  <span>Token: <code style={{ color: 'var(--primary)' }}>{challenge.token.substring(0, 18)}...</code></span>
-                  <span style={{ color: timeLeft < 20 ? 'var(--danger)' : 'var(--warning)', fontWeight: 700 }}>
-                    ⏱️ Expiration: {timeLeft}s remaining
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', marginTop: '0.75rem' }}>
+                  <span>Token: <code>{challenge.token.substring(0, 22)}...</code></span>
+                  <span style={{ color: timeLeft < 20 ? 'var(--danger-red)' : 'var(--warning-amber)', fontWeight: 700 }}>
+                    Expiration: {timeLeft}s remaining
                   </span>
                 </div>
 
-                <div className="countdown-bar-container">
+                <div style={{ width: '100%', height: '6px', background: 'rgba(37, 99, 235, 0.15)', borderRadius: '3px', overflow: 'hidden', marginTop: '0.75rem' }}>
                   <div
-                    className="countdown-bar"
                     style={{
+                      height: '100%',
                       width: `${(timeLeft / 90) * 100}%`,
-                      background: timeLeft < 20 ? 'var(--danger)' : 'var(--primary-gradient)'
+                      background: timeLeft < 20 ? 'var(--danger-red)' : 'var(--primary-blue)',
+                      transition: 'width 1s linear'
                     }}
                   ></div>
                 </div>
               </div>
 
               {isRecording && (
-                <div className="visualizer-box">
-                  <div className="audio-waves">
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
-                    <div className="wave-bar"></div>
+                <div className="light-spectrum-box">
+                  <div className="light-bars-flex">
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <div key={i} className="light-bar"></div>
+                    ))}
                   </div>
                 </div>
               )}
 
               <button
-                className={`btn-record ${isRecording ? 'recording' : ''}`}
+                className={`btn-saas-record ${isRecording ? 'active-recording' : ''}`}
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={verifying}
               >
                 {isRecording
-                  ? '🔴 Stop Recording & Submit Response'
+                  ? 'Stop Recording & Submit Response'
                   : verifying
-                  ? 'Verifying L2 → L1 → L3 Pipeline...'
-                  : '🎙️ Speak Phrase & Verify'}
+                  ? 'Processing L2 → L1 → L3 Security Pipeline...'
+                  : 'Speak Challenge Phrase & Authenticate'}
               </button>
             </div>
           )}
@@ -194,14 +195,14 @@ export function VerifyPage({ activeUser }) {
           {statusMsg && (
             <div
               style={{
-                marginTop: '1.25rem',
-                padding: '0.85rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                background: statusMsg.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
-                border: `1px solid ${statusMsg.type === 'success' ? 'var(--success-border)' : 'var(--danger-border)'}`,
-                color: statusMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
-                fontSize: '0.9rem',
-                fontWeight: 600
+                marginTop: '1.5rem',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-lg)',
+                background: statusMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+                border: `1px solid ${statusMsg.type === 'success' ? 'var(--success-green)' : 'var(--danger-red)'}`,
+                color: statusMsg.type === 'success' ? 'var(--success-green)' : 'var(--danger-red)',
+                fontSize: '0.92rem',
+                fontWeight: 700
               }}
             >
               {statusMsg.text}
@@ -209,46 +210,59 @@ export function VerifyPage({ activeUser }) {
           )}
 
           {verifyResult && (
-            <div className={`result-card ${verifyResult.result}`}>
-              <div className="result-header">
-                <div>
-                  <span className={`badge-result ${verifyResult.result}`}>
+            <div className={`light-decision-card ${verifyResult.result}`}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span className={`badge-decision-light ${verifyResult.result}`}>
                     {verifyResult.result}
                   </span>
-                  <span style={{ marginLeft: '12px', fontSize: '0.95rem', fontWeight: 600 }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
                     {verifyResult.reason}
                   </span>
                 </div>
+
                 {verifyResult.layer_blocked && (
-                  <div style={{ fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 700 }}>
-                    🛑 Blocked at Layer {verifyResult.layer_blocked}
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--danger-red)', fontWeight: 700 }}>
+                    Blocked at Layer {verifyResult.layer_blocked}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>L2 Deepfake Label</div>
-                  <div style={{ fontWeight: 700, color: verifyResult.l2_label === 'spoof' ? 'var(--danger)' : 'var(--success)' }}>
+              <div className="saas-metrics-grid">
+                <div className="saas-stat-card">
+                  <div className="saas-stat-label">L2 Deepfake Label</div>
+                  <div className="saas-stat-val" style={{ color: verifyResult.l2_label === 'spoof' ? 'var(--danger-red)' : 'var(--success-green)' }}>
                     {verifyResult.l2_label?.toUpperCase() || 'BONAFIDE'}
                   </div>
                 </div>
 
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>L2 Spoof Confidence</div>
-                  <div style={{ fontWeight: 700 }}>{(verifyResult.l2_confidence * 100).toFixed(1)}%</div>
+                <div className="saas-stat-card">
+                  <div className="saas-stat-label">L2 Spoof Confidence</div>
+                  <div className="saas-stat-val">
+                    {(verifyResult.l2_confidence * 100).toFixed(1)}%
+                  </div>
                 </div>
 
-                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>L1 Speaker Similarity</div>
-                  <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{(verifyResult.l1_score * 100).toFixed(1)}%</div>
+                <div className="saas-stat-card">
+                  <div className="saas-stat-label">L1 Speaker Similarity</div>
+                  <div className="saas-stat-val" style={{ color: 'var(--primary-blue)' }}>
+                    {(verifyResult.l1_score * 100).toFixed(1)}%
+                  </div>
                 </div>
               </div>
 
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                FULL API RESPONSE JSON (POST /auth/verify)
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  POST /auth/verify Full REST Response JSON
+                </div>
+                {onComplete && (
+                  <button className="btn-saas-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={onComplete}>
+                    Proceed to Analytics →
+                  </button>
+                )}
               </div>
-              <pre className="json-viewer">{JSON.stringify(verifyResult, null, 2)}</pre>
+
+              <pre className="light-inspector-box">{JSON.stringify(verifyResult, null, 2)}</pre>
             </div>
           )}
         </>

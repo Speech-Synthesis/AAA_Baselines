@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { Sidebar, HeaderStepper } from './components/Navbar';
 import { RegisterPage } from './components/RegisterPage';
 import { EnrollPage } from './components/EnrollPage';
 import { LoginPage } from './components/LoginPage';
@@ -11,26 +11,35 @@ function App() {
   const [activeTab, setActiveTab] = useState('register');
   const [isServerLive, setIsServerLive] = useState(false);
   
-  // Default mock initial user
+  // Default initial users
   const initialUsers = getMockStore().users;
   const [registeredUsers, setRegisteredUsers] = useState(initialUsers);
   const [activeUser, setActiveUser] = useState(initialUsers[0]);
 
   useEffect(() => {
-    // Check server availability on mount
+    // Check server health
     checkServerHealth().then(setIsServerLive);
   }, []);
 
   return (
-    <div className="app-container">
-      <Navbar
+    <div className="saas-layout">
+      {/* Sidebar Navigation */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeUser={activeUser}
         isServerLive={isServerLive}
       />
 
-      <main>
+      {/* Main Process Flow Content Area */}
+      <main className="saas-main-content">
+        {/* Header Process Flow Stepper */}
+        <HeaderStepper
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+
+        {/* Step 1: Register */}
         {activeTab === 'register' && (
           <RegisterPage
             activeUser={activeUser}
@@ -41,6 +50,7 @@ function App() {
           />
         )}
 
+        {/* Step 2: Enroll */}
         {activeTab === 'enroll' && (
           <EnrollPage
             activeUser={activeUser}
@@ -48,6 +58,20 @@ function App() {
           />
         )}
 
+        {/* Step 3: Authenticate */}
+        {activeTab === 'verify' && (
+          <VerifyPage
+            activeUser={activeUser}
+            onComplete={() => setActiveTab('dashboard')}
+          />
+        )}
+
+        {/* Step 4: Audit & Analytics */}
+        {activeTab === 'dashboard' && (
+          <DashboardPage activeUser={activeUser} />
+        )}
+
+        {/* Advanced Step: Switch User */}
         {activeTab === 'login' && (
           <LoginPage
             activeUser={activeUser}
@@ -55,14 +79,6 @@ function App() {
             registeredUsers={registeredUsers}
             onSelectUser={() => setActiveTab('verify')}
           />
-        )}
-
-        {activeTab === 'verify' && (
-          <VerifyPage activeUser={activeUser} />
-        )}
-
-        {activeTab === 'dashboard' && (
-          <DashboardPage activeUser={activeUser} />
         )}
       </main>
     </div>

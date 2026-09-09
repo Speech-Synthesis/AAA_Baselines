@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { enrollVoice } from '../api';
+import { convertBlobTo16kHzWav } from '../utils/audioEncoder';
 
 export function EnrollPage({ activeUser, onComplete }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -13,7 +14,7 @@ export function EnrollPage({ activeUser, onComplete }) {
 
   const startRecording = async () => {
     if (!activeUser) {
-      setStatusMsg({ type: 'error', text: 'Please register or select an active user first!' });
+      setStatusMsg({ type: 'error', text: 'Please register or select an active user first' });
       return;
     }
 
@@ -28,8 +29,10 @@ export function EnrollPage({ activeUser, onComplete }) {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        await handleAudioUpload(audioBlob);
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Convert to 16kHz Mono WAV Blob for 100% backend compatibility
+        const wavBlob = await convertBlobTo16kHzWav(rawBlob);
+        await handleAudioUpload(wavBlob);
       };
 
       recorder.start();
@@ -59,99 +62,111 @@ export function EnrollPage({ activeUser, onComplete }) {
         setCurrentStep((prev) => prev + 1);
         setStatusMsg({
           type: 'success',
-          text: `Sample ${currentStep} enrolled successfully! Total samples: ${newCount}. Speak next sample.`
+          text: `Voice Sample ${currentStep} enrolled. Total samples: ${newCount}. Speak next sample.`
         });
       } else {
         setStatusMsg({
           type: 'success',
-          text: `🎉 All 3 voice samples enrolled! Voiceprint generated with sample count: ${newCount}.`
+          text: `Voiceprint enrollment complete. Built 192-dim embedding with ${newCount} total samples.`
         });
-        if (onComplete) setTimeout(() => onComplete(), 2000);
       }
     } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message || 'Enrollment upload failed' });
+      setStatusMsg({ type: 'error', text: err.message || 'Enrollment audio upload failed' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="glass-card">
-      <div className="card-title">🎙️ Voiceprint Enrollment</div>
-      <div className="card-subtitle">
-        Record 3 spoken samples to build and adapt the user's ECAPA-TDNN speaker embedding (POST /auth/enroll)
+    <div className="saas-card">
+      <div className="card-title-lg">Speaker Voiceprint Enrollment</div>
+      <div className="card-subtitle-text">
+        Record 3 audio samples (min 3s) to extract ECAPA-TDNN 192-dim acoustic embeddings (Endpoint: <code>POST /auth/enroll</code>)
       </div>
 
       {!activeUser ? (
-        <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--warning)', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
-          ⚠️ No active user selected. Please go to the <strong>Register</strong> tab first.
+        <div style={{ padding: '1.75rem', textAlign: 'center', color: 'var(--warning-amber)', background: '#fffbeb', borderRadius: 'var(--radius-lg)', border: '1px solid #fde68a', fontWeight: 600 }}>
+          No active user selected. Please complete Register first.
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <div>
-              Active Enrollee: <strong>{activeUser.name}</strong>
+              Active Enrollee: <strong style={{ color: 'var(--text-dark)' }}>{activeUser.name}</strong>
             </div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Total Samples in DB: <strong>{sampleCount}</strong>
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+              Database Sample Count: <strong style={{ color: 'var(--primary-blue)' }}>{sampleCount}</strong>
             </div>
           </div>
 
-          <div className="progress-steps">
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
             {[1, 2, 3].map((step) => (
               <div
                 key={step}
-                className={`step-pill ${
-                  step < currentStep ? 'completed' : step === currentStep ? 'active' : ''
-                }`}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  textAlign: 'center',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-light)',
+                  background: step < currentStep ? 'var(--success-light)' : step === currentStep ? 'var(--primary-light)' : '#fff',
+                  borderColor: step < currentStep ? 'var(--success-green)' : step === currentStep ? 'var(--primary-blue)' : 'var(--border-light)',
+                  color: step < currentStep ? 'var(--success-green)' : step === currentStep ? 'var(--primary-blue)' : 'var(--text-muted)',
+                  fontWeight: 700,
+                  fontSize: '0.9rem'
+                }}
               >
-                {step < currentStep ? `✓ Sample ${step}` : `Sample ${step}`}
+                {step < currentStep ? `Sample ${step} Complete` : `Sample ${step}`}
               </div>
             ))}
           </div>
 
           {isRecording && (
-            <div className="visualizer-box">
-              <div className="audio-waves">
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
-                <div className="wave-bar"></div>
+            <div className="light-spectrum-box">
+              <div className="light-bars-flex">
+                {Array.from({ length: 16 }).map((_, i) => (
+                  <div key={i} className="light-bar"></div>
+                ))}
               </div>
             </div>
           )}
 
           <div style={{ marginTop: '1.5rem' }}>
             <button
-              className={`btn-record ${isRecording ? 'recording' : ''}`}
+              className={`btn-saas-record ${isRecording ? 'active-recording' : ''}`}
               onClick={isRecording ? stopRecording : startRecording}
               disabled={loading}
             >
               {isRecording
-                ? '🔴 Stop Recording (Release to Upload)'
+                ? 'Stop Recording & Upload Sample'
                 : loading
-                ? 'Processing Embedding...'
-                : `🎙️ Record Sample ${currentStep} of 3 (Min 3 Seconds)`}
+                ? 'Extracting 192-dim Embedding...'
+                : `Record Voice Sample ${currentStep} of 3 (Min 3 Seconds)`}
             </button>
           </div>
 
           {statusMsg && (
             <div
               style={{
-                marginTop: '1.25rem',
-                padding: '0.85rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                background: statusMsg.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
-                border: `1px solid ${statusMsg.type === 'success' ? 'var(--success-border)' : 'var(--danger-border)'}`,
-                color: statusMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
-                fontSize: '0.9rem',
-                fontWeight: 600
+                marginTop: '1.5rem',
+                padding: '1rem 1.25rem',
+                borderRadius: 'var(--radius-lg)',
+                background: statusMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+                border: `1px solid ${statusMsg.type === 'success' ? 'var(--success-green)' : 'var(--danger-red)'}`,
+                color: statusMsg.type === 'success' ? 'var(--success-green)' : 'var(--danger-red)',
+                fontSize: '0.92rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justify: 'space-between'
               }}
             >
-              {statusMsg.text}
+              <span>{statusMsg.text}</span>
+              {currentStep === 3 && onComplete && (
+                <button className="btn-saas-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={onComplete}>
+                  Proceed to Authenticate
+                </button>
+              )}
             </div>
           )}
         </>

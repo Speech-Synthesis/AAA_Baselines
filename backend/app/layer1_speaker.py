@@ -25,15 +25,13 @@ MODEL = EncoderClassifier.from_hparams(
 def _load_audio(audio_bytes: bytes) -> torch.Tensor:
     """
     Load audio bytes and convert to 16kHz mono waveform.
-
-    Args:
-        audio_bytes: Raw WAV file bytes
-
-    Returns:
-        Tensor of shape (1, num_samples) at 16kHz
+    Includes fallback decoding for browser audio formats.
     """
-    # Use soundfile to read audio (no FFmpeg dependency)
-    audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+    try:
+        audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
+    except Exception:
+        import librosa
+        audio_data, sample_rate = librosa.load(io.BytesIO(audio_bytes), sr=16000)
 
     # Convert to mono if stereo
     if len(audio_data.shape) > 1:
