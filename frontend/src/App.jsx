@@ -5,16 +5,14 @@ import { EnrollPage } from './components/EnrollPage';
 import { LoginPage } from './components/LoginPage';
 import { VerifyPage } from './components/VerifyPage';
 import { DashboardPage } from './components/DashboardPage';
-import { checkServerHealth, getMockStore } from './api';
+import { checkServerHealth } from './api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('register');
   const [isServerLive, setIsServerLive] = useState(false);
-  
-  // Default initial users
-  const initialUsers = getMockStore().users;
-  const [registeredUsers, setRegisteredUsers] = useState(initialUsers);
-  const [activeUser, setActiveUser] = useState(initialUsers[0]);
+
+  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [activeUser, setActiveUser] = useState(null);
 
   useEffect(() => {
     // Check server health
