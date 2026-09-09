@@ -10,7 +10,6 @@ export function VerifyPage({ activeUser, onComplete }) {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState(null);
   const [statusMsg, setStatusMsg] = useState(null);
-  const [forceSpoof, setForceSpoof] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -98,7 +97,7 @@ export function VerifyPage({ activeUser, onComplete }) {
     clearInterval(timerRef.current);
 
     try {
-      const res = await verifyVoice(activeUser.id, challenge.token, audioBlob, forceSpoof);
+      const res = await verifyVoice(activeUser.id, challenge.token, audioBlob);
       setVerifyResult(res);
       setChallenge(null);
     } catch (err) {
@@ -121,20 +120,10 @@ export function VerifyPage({ activeUser, onComplete }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
             <div>
               Target Identity: <strong style={{ color: 'var(--text-dark)' }}>{activeUser.name}</strong> ({activeUser.email})
             </div>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: forceSpoof ? 'var(--danger-red)' : 'var(--text-muted)', fontWeight: 600 }}>
-              <input
-                type="checkbox"
-                checked={forceSpoof}
-                onChange={(e) => setForceSpoof(e.target.checked)}
-                style={{ accentColor: 'var(--danger-red)', width: '16px', height: '16px' }}
-              />
-              Simulate Deepfake Attack (Test Layer 2)
-            </label>
           </div>
 
           {!challenge ? (
