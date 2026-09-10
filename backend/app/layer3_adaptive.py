@@ -131,6 +131,13 @@ def get_token_user_id(token: str) -> Optional[str]:
     return None
 
 
+def get_token_phrase(token: str) -> Optional[str]:
+    """Get the challenge phrase associated with a token."""
+    if token in _token_store:
+        return _token_store[token]["phrase"]
+    return None
+
+
 def update_voiceprint(
     old_embedding: list[float],
     new_embedding: list[float],

@@ -119,7 +119,7 @@ export function DashboardPage({ activeUser }) {
                         <span className={`badge-tag-light ${log.result}`}>{log.result}</span>
                       </td>
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
-                        {log.layer_blocked ? `Layer ${log.layer_blocked}` : '—'}
+                        {log.layer_blocked ? `L${log.layer_blocked}${log.layer_blocked === 4 ? ' (ASR)' : ''}` : '—'}
                       </td>
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem' }}>
                         {(log.l2_confidence * 100).toFixed(1)}%

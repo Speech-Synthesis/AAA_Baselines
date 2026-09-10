@@ -111,7 +111,7 @@ export function VerifyPage({ activeUser, onComplete }) {
     <div className="saas-card">
       <div className="card-title-lg">Adaptive Authentication Protocol</div>
       <div className="card-subtitle-text">
-        Dynamic Challenge-Response (Layer 3) → Deepfake Detection (Layer 2) → Speaker Verification (Layer 1)
+        Deepfake Detection (L2) → Phrase Match (ASR) → Speaker Verification (L1) → Token (L3)
       </div>
 
       {!activeUser ? (
@@ -175,7 +175,7 @@ export function VerifyPage({ activeUser, onComplete }) {
                 {isRecording
                   ? 'Stop Recording & Submit Response'
                   : verifying
-                  ? 'Processing L2 → L1 → L3 Security Pipeline...'
+                  ? 'Processing L2 → ASR → L1 → L3 Pipeline...'
                   : 'Speak Challenge Phrase & Authenticate'}
               </button>
             </div>
@@ -238,7 +238,25 @@ export function VerifyPage({ activeUser, onComplete }) {
                     {(verifyResult.l1_score * 100).toFixed(1)}%
                   </div>
                 </div>
+
+                <div className="saas-stat-card">
+                  <div className="saas-stat-label">L3 ASR Phrase Match</div>
+                  <div className="saas-stat-val" style={{ color: verifyResult.asr_similarity >= 0.6 ? 'var(--success-green)' : 'var(--danger-red)' }}>
+                    {verifyResult.asr_similarity != null ? `${(verifyResult.asr_similarity * 100).toFixed(1)}%` : 'N/A'}
+                  </div>
+                </div>
               </div>
+
+              {verifyResult.asr_transcript && (
+                <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.35rem' }}>
+                    ASR Transcription (Whisper)
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--text-dark)' }}>
+                    "{verifyResult.asr_transcript}"
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', marginBottom: '0.5rem' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>

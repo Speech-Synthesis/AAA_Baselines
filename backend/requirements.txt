@@ -23,6 +23,9 @@ transformers>=4.35.0
 soundfile>=0.12.1
 scipy>=1.10.0
 
+# Layer 3 - Speech-to-Text (Whisper ASR)
+openai-whisper>=20231117
+
 # Utilities
 python-dotenv>=1.0.0
 pydantic>=2.5.0

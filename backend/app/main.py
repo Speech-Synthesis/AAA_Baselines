@@ -16,7 +16,8 @@ from .db import get_db, engine, Base
 from .models import User, Voiceprint, Challenge, AuthLog
 from .layer1_speaker import enroll_speaker, verify_speaker
 from .layer2_deepfake import detect_spoof
-from .layer3_adaptive import generate_challenge, verify_token, update_voiceprint, get_token_user_id
+from .layer3_adaptive import generate_challenge, verify_token, update_voiceprint, get_token_user_id, get_token_phrase
+from .layer3_asr import verify_phrase
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -38,7 +39,8 @@ app.add_middleware(
 
 # Thresholds (tune in Phase 2)
 L2_SPOOF_THRESHOLD = 0.5  # Reject if spoof confidence > this
-L1_SIMILARITY_THRESHOLD = 0.65  # Reject if speaker similarity < this
+L1_SIMILARITY_THRESHOLD = 0.50  # Reject if speaker similarity < this
+ASR_PHRASE_THRESHOLD = 0.6  # Reject if phrase similarity < this
 
 
 # === Request/Response Models ===
@@ -72,6 +74,8 @@ class VerifyResponse(BaseModel):
     l2_label: str
     l2_confidence: float
     l1_score: float
+    asr_transcript: Optional[str] = None
+    asr_similarity: Optional[float] = None
 
 
 class VoiceprintHistory(BaseModel):
@@ -269,6 +273,38 @@ async def verify(
             l1_score=0.0
         )
 
+    # === LAYER 3A: ASR Phrase Verification (before speaker check) ===
+    expected_phrase = get_token_phrase(token)
+    asr_match, asr_similarity, asr_transcript = verify_phrase(
+        audio_bytes, expected_phrase or "", ASR_PHRASE_THRESHOLD
+    )
+
+    if not asr_match:
+        # Log and reject - wrong phrase spoken
+        log = AuthLog(
+            user_id=uuid.UUID(user_id),
+            l2_label=l2_label,
+            l2_confidence=l2_confidence,
+            l1_score=0.0,
+            result="REJECT",
+            layer_blocked=4  # Layer 4 = ASR phrase mismatch
+        )
+        db.add(log)
+        db.commit()
+
+        return VerifyResponse(
+            result="REJECT",
+            confidence=asr_similarity,
+            layer_blocked=4,
+            session_id=session_id,
+            reason=f"Phrase mismatch: expected '{expected_phrase}', heard '{asr_transcript}'",
+            l2_label=l2_label,
+            l2_confidence=l2_confidence,
+            l1_score=0.0,
+            asr_transcript=asr_transcript,
+            asr_similarity=asr_similarity
+        )
+
     # === LAYER 1: Speaker Verification ===
     l1_result = verify_speaker(audio_bytes, voiceprint.embedding)
     l1_score = l1_result["score"]
@@ -295,10 +331,12 @@ async def verify(
             reason="Speaker verification failed",
             l2_label=l2_label,
             l2_confidence=l2_confidence,
-            l1_score=l1_score
+            l1_score=l1_score,
+            asr_transcript=asr_transcript,
+            asr_similarity=asr_similarity
         )
 
-    # === LAYER 3: Token Verification ===
+    # === LAYER 3B: Token Verification ===
     if not verify_token(token):
         # Log and reject
         log = AuthLog(
@@ -355,7 +393,9 @@ async def verify(
         reason="Authentication successful",
         l2_label=l2_label,
         l2_confidence=l2_confidence,
-        l1_score=l1_score
+        l1_score=l1_score,
+        asr_transcript=asr_transcript,
+        asr_similarity=asr_similarity
     )
 
 
@@ -397,6 +437,8 @@ async def get_auth_logs(user_id: str, db: Session = Depends(get_db)):
             return "Deepfake/spoof detected"
         if log.layer_blocked == 3:
             return "Invalid or expired token"
+        if log.layer_blocked == 4:
+            return "Challenge phrase mismatch"
         return "Unknown"
 
     return [
