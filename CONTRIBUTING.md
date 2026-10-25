@@ -1,139 +1,115 @@
-# Contributing to AAA Engine
+# Contributing Guide
 
-Thank you for your interest in contributing to AAA Engine! This document provides guidelines for contributing to the project.
+Guidelines for contributing to AAA Engine.
+
+---
 
 ## Table of Contents
+
 - [Code of Conduct](#code-of-conduct)
-- [How to Contribute](#how-to-contribute)
-- [Development Setup](#development-setup)
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
 - [Coding Standards](#coding-standards)
 - [Commit Guidelines](#commit-guidelines)
 - [Pull Request Process](#pull-request-process)
+- [Testing](#testing)
+- [Documentation](#documentation)
 
 ---
 
 ## Code of Conduct
 
-### Our Standards
+### Expected Behavior
 
-- Be respectful and inclusive
-- Accept constructive criticism
-- Focus on what's best for the project
-- Show empathy towards other contributors
+- Be respectful and inclusive in all communications
+- Accept constructive criticism professionally
+- Focus on what benefits the project
+- Support fellow contributors
 
 ### Unacceptable Behavior
 
 - Harassment or discriminatory language
-- Trolling or insulting comments
-- Publishing others' private information
+- Personal attacks or trolling
+- Publishing private information without consent
 - Other unprofessional conduct
 
 ---
 
-## How to Contribute
+## Getting Started
 
-### Reporting Bugs
-
-**Before submitting a bug report:**
-1. Check existing [Issues](https://github.com/Speech-Synthesis/AAA_Baselines/issues)
-2. Ensure you're using the latest version
-3. Verify the issue is reproducible
-
-**Bug Report Template:**
-```markdown
-**Description**: Brief description of the bug
-
-**Steps to Reproduce**:
-1. Go to '...'
-2. Click on '...'
-3. See error
-
-**Expected Behavior**: What should happen
-
-**Actual Behavior**: What actually happens
-
-**Environment**:
-- OS: [e.g., Windows 11]
-- Python Version: [e.g., 3.11.2]
-- Node Version: [e.g., 20.10.0]
-- Browser: [e.g., Chrome 120]
-
-**Logs**:
-```
-Paste relevant error logs here
-```
-```
-
-### Suggesting Features
-
-**Feature Request Template:**
-```markdown
-**Problem**: What problem does this solve?
-
-**Proposed Solution**: How should it work?
-
-**Alternatives**: What alternatives have you considered?
-
-**Additional Context**: Any relevant information
-```
-
-### Contributing Code
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/your-feature-name`
-3. **Make your changes**: Follow coding standards
-4. **Test your changes**: Ensure all tests pass
-5. **Commit**: Follow commit guidelines
-6. **Push**: `git push origin feature/your-feature-name`
-7. **Open Pull Request**: Use PR template
-
----
-
-## Development Setup
-
-### 1. Fork and Clone
+### Fork and Clone
 
 ```bash
+# Fork the repository on GitHub, then:
 git clone https://github.com/YOUR_USERNAME/AAA_Baselines.git
 cd AAA_Baselines
+
+# Add upstream remote
 git remote add upstream https://github.com/Speech-Synthesis/AAA_Baselines.git
 ```
 
-### 2. Backend Setup
+### Development Environment
 
 ```bash
+# Backend setup
 cd backend
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-pip install pytest pytest-cov black flake8 mypy  # Dev dependencies
-```
+pip install pytest pytest-cov black flake8 mypy  # Dev tools
 
-### 3. Frontend Setup
-
-```bash
-cd frontend
+# Frontend setup
+cd ../frontend
 npm install
 ```
 
-### 4. Create .env File
+### Environment Configuration
 
 ```bash
 cp backend/.env.example backend/.env
-# Edit .env with your database credentials
+# Edit .env with your settings
 ```
 
-### 5. Run Tests
+---
 
-```bash
-# Backend tests
-cd backend
-pytest
+## Development Workflow
 
-# Frontend tests
-cd frontend
-npm test
-```
+### Branch Strategy
+
+| Branch Type | Naming | Example |
+|-------------|--------|---------|
+| Feature | `feature/<description>` | `feature/gpu-acceleration` |
+| Bug Fix | `fix/<description>` | `fix/cors-header-issue` |
+| Documentation | `docs/<description>` | `docs/api-reference` |
+| Refactor | `refactor/<description>` | `refactor/layer1-cleanup` |
+
+### Workflow Steps
+
+1. **Sync with upstream**
+   ```bash
+   git checkout main
+   git pull upstream main
+   ```
+
+2. **Create feature branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Make changes and commit**
+   ```bash
+   git add <files>
+   git commit -m "feat(scope): description"
+   ```
+
+4. **Push to your fork**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+5. **Open Pull Request**
+   - Use the PR template
+   - Link related issues
 
 ---
 
@@ -141,11 +117,11 @@ npm test
 
 ### Python (Backend)
 
-**Style Guide**: PEP 8
+**Style:** PEP 8
 
-**Formatting**:
+**Tools:**
 ```bash
-# Auto-format code
+# Format code
 black app/
 
 # Check linting
@@ -155,86 +131,82 @@ flake8 app/ --max-line-length=100
 mypy app/
 ```
 
-**Code Structure**:
+**Naming Conventions:**
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Functions | snake_case | `verify_speaker` |
+| Variables | snake_case | `audio_bytes` |
+| Classes | PascalCase | `AuthLogResponse` |
+| Constants | UPPER_SNAKE | `L2_THRESHOLD` |
+| Private | _leading | `_load_model` |
+
+**Function Documentation:**
+
 ```python
-# Good
-def verify_speaker(audio_bytes: bytes, voiceprint: list[float]) -> dict:
+def verify_speaker(
+    audio_bytes: bytes,
+    stored_embedding: list[float]
+) -> dict:
     """
-    Verify speaker identity against stored voiceprint.
+    Compare audio to stored voiceprint.
 
     Args:
-        audio_bytes: Raw WAV audio data
-        voiceprint: Stored 192-dim ECAPA embedding
+        audio_bytes: Raw WAV audio data (16kHz mono)
+        stored_embedding: 192-dimensional ECAPA embedding
 
     Returns:
-        {"score": float, "embedding": list[float]}
+        dict: {
+            "score": float,  # Cosine similarity [0, 1]
+            "embedding": list[float]  # For EMA update
+        }
+
+    Raises:
+        ValueError: If audio format is invalid
+
+    Example:
+        >>> audio = open("sample.wav", "rb").read()
+        >>> result = verify_speaker(audio, voiceprint)
+        >>> result["score"]
+        0.87
     """
-    # Implementation
-    pass
-
-# Bad
-def verify(a, v):  # No type hints, unclear names
-    pass  # No docstring
 ```
-
-**Naming Conventions**:
-- Functions/variables: `snake_case`
-- Classes: `PascalCase`
-- Constants: `UPPER_SNAKE_CASE`
-- Private methods: `_leading_underscore`
 
 ### JavaScript/React (Frontend)
 
-**Style Guide**: Airbnb JavaScript Style Guide
+**Style:** Airbnb JavaScript Style Guide
 
-**Formatting**:
-```bash
-npm run lint
-npm run format  # If available
-```
+**Component Structure:**
 
-**Component Structure**:
 ```jsx
-// Good
 import { useState } from 'react';
-import { registerUser } from '../api';
+import { apiCall } from '../api';
 
-export default function Register() {
-  const [name, setName] = useState('');
+export default function ComponentName() {
+  const [state, setState] = useState(initialValue);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleEvent = async (event) => {
+    event.preventDefault();
     // Implementation
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
       {/* JSX */}
-    </form>
+    </div>
   );
-}
-
-// Bad
-function register() {  // Not exported, lowercase component name
-  var n = '';  // Use const/let, not var
-  // No clear structure
 }
 ```
 
-**Naming Conventions**:
-- Components: `PascalCase`
-- Functions/variables: `camelCase`
-- Constants: `UPPER_SNAKE_CASE`
-- Event handlers: `handleEventName`
+**Naming Conventions:**
 
-### Database
-
-**Migration Naming**: `YYYY_MM_DD_description.sql`
-
-**Schema Changes**:
-- Always create migrations (don't edit models.py directly in production)
-- Include rollback scripts
-- Test migrations on sample data
+| Element | Convention | Example |
+|---------|------------|---------|
+| Components | PascalCase | `RegisterPage` |
+| Functions | camelCase | `handleSubmit` |
+| Variables | camelCase | `audioBlob` |
+| Constants | UPPER_SNAKE | `API_BASE` |
+| Event handlers | handle* | `handleClick` |
 
 ---
 
@@ -250,51 +222,60 @@ function register() {  // Not exported, lowercase component name
 <footer>
 ```
 
-**Types**:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code formatting (no logic change)
-- `refactor`: Code restructuring (no behavior change)
-- `test`: Add/modify tests
-- `chore`: Build process, dependencies
+### Types
 
-**Examples**:
-```bash
-feat(layer1): Add ECAPA-TDNN speaker verification
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation changes |
+| `style` | Code formatting (no logic change) |
+| `refactor` | Code restructuring (no behavior change) |
+| `test` | Add or modify tests |
+| `chore` | Build process, dependencies |
 
-- Implement embedding extraction
-- Add cosine similarity comparison
-- Configure threshold at 0.7
+### Scopes
 
-Closes #23
+| Scope | Description |
+|-------|-------------|
+| `layer1` | Speaker verification |
+| `layer2` | Deepfake detection |
+| `layer3` | Challenge-response, EMA |
+| `asr` | Phrase verification |
+| `api` | API routes |
+| `db` | Database |
+| `frontend` | React application |
+| `docker` | Container configuration |
 
----
+### Examples
 
-fix(frontend): Resolve CORS error on production
+**Good:**
+```
+feat(layer2): add confidence threshold configuration
 
-Change API_BASE to use environment-based detection instead
-of hardcoded localhost.
+- Add L2_SPOOF_THRESHOLD environment variable
+- Update detect_spoof() to use configurable threshold
+- Add threshold documentation
 
-Fixes #45
-
----
-
-docs(readme): Update installation instructions
-
-Add Supabase setup steps and troubleshooting section.
+Closes #45
 ```
 
-**Bad Examples**:
-```bash
-# Too vague
+```
+fix(frontend): resolve microphone permission handling
+
+The permission dialog was not appearing on Safari.
+Added explicit getUserMedia call with proper error handling.
+
+Fixes #67
+```
+
+**Bad:**
+```
 update stuff
+```
 
-# No type prefix
+```
 added feature
-
-# Too long subject (>72 chars)
-feat(backend): Implement the new authentication layer with deepfake detection and speaker verification
 ```
 
 ---
@@ -303,11 +284,13 @@ feat(backend): Implement the new authentication layer with deepfake detection an
 
 ### Before Submitting
 
+Verify the following:
+
 - [ ] Code follows style guidelines
-- [ ] All tests pass
+- [ ] All existing tests pass
 - [ ] New tests added for new features
-- [ ] Documentation updated (README, docstrings)
-- [ ] No merge conflicts with main branch
+- [ ] Documentation updated
+- [ ] No merge conflicts with main
 - [ ] Branch is up-to-date with main
 
 ### PR Template
@@ -333,212 +316,165 @@ Brief description of changes
 - [ ] Documentation updated
 - [ ] No new warnings
 
-## Screenshots (if applicable)
-[Add screenshots for UI changes]
-
 ## Related Issues
-Closes #[issue number]
+Closes #<issue number>
 ```
 
 ### Review Process
 
-1. **Automated Checks**: CI/CD must pass
-2. **Code Review**: At least 1 maintainer approval required
-3. **Testing**: Reviewers verify functionality
-4. **Merge**: Squash and merge to main
+1. Automated CI checks must pass
+2. At least one maintainer approval required
+3. All review comments addressed
+4. Squash and merge to main
 
 ### After Merge
 
-- Delete your feature branch
-- Update your fork:
-  ```bash
-  git checkout main
-  git pull upstream main
-  git push origin main
-  ```
+```bash
+# Delete local branch
+git branch -d feature/your-feature
 
----
-
-## Project Structure
-
-```
-AAA_Baselines/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI app + routes
-│   │   ├── db.py                # Database engine
-│   │   ├── models.py            # ORM models
-│   │   ├── layer1_speaker.py    # Speaker verification
-│   │   ├── layer2_deepfake.py   # Deepfake detection
-│   │   ├── layer3_adaptive.py   # Challenge + EMA
-│   │   └── layer3_asr.py        # ASR phrase verification
-│   ├── tests/                   # Backend tests
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/          # React components
-│   │   ├── api.js               # API client
-│   │   └── App.jsx              # Router
-│   └── package.json
-└── docs/
-    ├── TEAM_CONTRACT.md         # Team contract
-    └── DB_SCHEMA.sql            # Database schema
+# Update your fork
+git checkout main
+git pull upstream main
+git push origin main
 ```
 
-### Where to Make Changes
-
-**Layer 1 (Speaker Verification)**: `backend/app/layer1_speaker.py`
-**Layer 2 (Deepfake Detection)**: `backend/app/layer2_deepfake.py`
-**Layer 3 (Challenge/EMA)**: `backend/app/layer3_adaptive.py`
-**ASR Phrase Verification**: `backend/app/layer3_asr.py`
-**API Routes**: `backend/app/main.py`
-**Database Models**: `backend/app/models.py`
-**Frontend Pages**: `frontend/src/components/`
-
 ---
 
-## Branch Strategy
-
-**Main Branch**: `main` (protected, requires PR)
-
-**Feature Branches**:
-- `feature/layer1-improvements`
-- `feature/frontend-dashboard`
-- `fix/cors-issue`
-- `docs/update-readme`
-
-**Original Team Branches** (historical):
-- `infra-backend` (Navadeep)
-- `layer1-speaker` (Surya)
-- `layer2-deepfake` (Nandan)
-- `layer3-frontend` (Aditya)
-
-**Naming Convention**: `<type>/<description>` (lowercase, hyphens)
-
----
-
-## Testing Guidelines
+## Testing
 
 ### Backend Tests
 
-**Location**: `backend/tests/`
+**Location:** `backend/tests/`
 
-**Example**:
+**Running Tests:**
+
+```bash
+cd backend
+source venv/bin/activate
+
+# Run all tests
+pytest
+
+# Verbose output
+pytest -v
+
+# Specific file
+pytest tests/test_layer1.py
+
+# With coverage
+pytest --cov=app
+```
+
+**Test Structure:**
+
 ```python
 import pytest
 from app.layer1_speaker import verify_speaker
 
-def test_speaker_verification_accept():
-    # Load test audio and voiceprint
-    audio = load_test_audio("user1_sample1.wav")
-    voiceprint = load_test_voiceprint("user1")
+class TestSpeakerVerification:
+    def test_verify_speaker_accept(self, sample_audio, sample_voiceprint):
+        result = verify_speaker(sample_audio, sample_voiceprint)
 
-    result = verify_speaker(audio, voiceprint)
+        assert "score" in result
+        assert "embedding" in result
+        assert result["score"] >= 0.0
+        assert result["score"] <= 1.0
+        assert len(result["embedding"]) == 192
 
-    assert result["score"] >= 0.7
-    assert len(result["embedding"]) == 192
-```
+    def test_verify_speaker_reject(self, sample_audio, different_voiceprint):
+        result = verify_speaker(sample_audio, different_voiceprint)
 
-**Run Tests**:
-```bash
-pytest                    # All tests
-pytest -v                 # Verbose
-pytest tests/test_layer1.py  # Specific file
-pytest --cov=app          # With coverage
+        assert result["score"] < 0.5
 ```
 
 ### Frontend Tests
 
-**Location**: `frontend/src/__tests__/`
+**Location:** `frontend/src/__tests__/`
 
-**Example**:
-```javascript
-import { render, screen } from '@testing-library/react';
-import Register from '../components/Register';
+**Running Tests:**
 
-test('renders registration form', () => {
-  render(<Register />);
-  expect(screen.getByText(/Register/i)).toBeInTheDocument();
-});
+```bash
+cd frontend
+npm test
 ```
 
 ---
 
 ## Documentation
 
-### Docstring Format (Python)
-
-```python
-def verify_speaker(audio_bytes: bytes, voiceprint: list[float]) -> dict:
-    """
-    Verify speaker identity using ECAPA-TDNN embeddings.
-
-    Args:
-        audio_bytes: Raw WAV audio data (16kHz mono)
-        voiceprint: Stored 192-dimensional embedding
-
-    Returns:
-        dict: {
-            "score": float (cosine similarity 0-1),
-            "embedding": list[float] (192-dim)
-        }
-
-    Raises:
-        ValueError: If audio format is invalid
-
-    Example:
-        >>> audio = open("sample.wav", "rb").read()
-        >>> voiceprint = [0.1, 0.2, ...]  # 192 values
-        >>> result = verify_speaker(audio, voiceprint)
-        >>> result["score"]
-        0.87
-    """
-```
-
 ### Code Comments
 
-```python
-# Good: Explain WHY, not WHAT
-# Use EMA to prevent one-shot voiceprint poisoning attacks
-voiceprint_new = 0.8 * voiceprint_old + 0.2 * embedding_current
+Write comments that explain "why", not "what":
 
-# Bad: Redundant comment
-# Multiply voiceprint_old by 0.8
-voiceprint_new = 0.8 * voiceprint_old + 0.2 * embedding_current
+```python
+# Good: Explain rationale
+# Use EMA alpha=0.2 to require ~10 samples for 50% shift,
+# preventing single-sample poisoning attacks
+voiceprint_new = 0.8 * voiceprint_old + 0.2 * embedding
+
+# Bad: State the obvious
+# Multiply old voiceprint by 0.8
+voiceprint_new = 0.8 * voiceprint_old + 0.2 * embedding
 ```
+
+### Documentation Files
+
+| File | Purpose |
+|------|---------|
+| README.md | Project overview |
+| ARCHITECTURE.md | Technical design |
+| INSTALLATION.md | Setup instructions |
+| CONTRIBUTING.md | This file |
+| CHANGELOG.md | Version history |
+| DEMO.md | Usage walkthrough |
+
+### Updating Documentation
+
+When making changes:
+
+1. Update relevant doc files
+2. Update docstrings for modified functions
+3. Update API documentation if endpoints change
+4. Add changelog entry for significant changes
 
 ---
 
-## Release Process
+## Project Structure Reference
 
-1. **Version Bump**: Update version in `package.json`, `__init__.py`
-2. **Changelog**: Update `CHANGELOG.md`
-3. **Tag**: `git tag -a v1.0.0 -m "Release v1.0.0"`
-4. **Push**: `git push origin main --tags`
-5. **GitHub Release**: Create release notes
-
-**Version Format**: Semantic Versioning (MAJOR.MINOR.PATCH)
-- MAJOR: Breaking changes
-- MINOR: New features (backward compatible)
-- PATCH: Bug fixes
+```
+AAA_Baselines/
+|
++-- backend/
+|   +-- app/
+|   |   +-- main.py              # API routes
+|   |   +-- db.py                # Database config
+|   |   +-- models.py            # ORM models
+|   |   +-- layer1_speaker.py    # Speaker verification
+|   |   +-- layer2_deepfake.py   # Deepfake detection
+|   |   +-- layer3_adaptive.py   # Challenge + EMA
+|   |   +-- layer3_asr.py        # Phrase verification
+|   +-- tests/                   # Backend tests
+|   +-- requirements.txt
+|
++-- frontend/
+|   +-- src/
+|   |   +-- components/          # React pages
+|   |   +-- api.js               # API client
+|   |   +-- App.jsx              # Router
+|   +-- package.json
+|
++-- docs/                        # Additional documentation
+```
 
 ---
 
 ## Getting Help
 
-- **Questions**: Open a [Discussion](https://github.com/Speech-Synthesis/AAA_Baselines/discussions)
-- **Bugs**: Open an [Issue](https://github.com/Speech-Synthesis/AAA_Baselines/issues)
-- **Security**: Email maintainers (do not open public issue)
+- **Questions:** Open a [Discussion](https://github.com/Speech-Synthesis/AAA_Baselines/discussions)
+- **Bugs:** Open an [Issue](https://github.com/Speech-Synthesis/AAA_Baselines/issues)
+- **Security:** Email maintainers directly (do not open public issue)
 
 ---
 
-## Recognition
-
-Contributors will be acknowledged in:
-- `README.md` Contributors section
-- GitHub Contributors page
-- Release notes (for significant contributions)
-
----
-
-**Thank you for contributing to AAA Engine!**
+**Thank you for contributing to AAA Engine.**

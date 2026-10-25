@@ -1,4 +1,4 @@
-# Hugging Face Spaces Dockerfile
+# AAA Engine - Docker Deployment
 # Multi-stage build for frontend + backend
 
 # Stage 1: Build frontend
@@ -18,6 +18,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -30,9 +31,9 @@ COPY backend/ .
 # Copy built frontend to static directory
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# HF Spaces uses port 7860
-ENV PORT=7860
-EXPOSE 7860
+# Default port (override with -e PORT=xxxx)
+ENV PORT=8000
+EXPOSE 8000
 
 # Run the app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT

@@ -1,118 +1,208 @@
----
-title: AAA Engine
-emoji: 🔐
-colorFrom: blue
-colorTo: purple
-sdk: gradio
-sdk_version: 4.44.0
-app_file: app.py
-pinned: false
-license: mit
+# AAA Engine
+
+**Adaptive Audio Authentication with Deepfake Detection**
+
+A production-ready voice authentication system that combines four security layers: deepfake detection, phrase verification, speaker recognition, and adaptive voiceprint evolution.
+
 ---
 
-# AAA Engine — Adaptive Audio Authentication
+## Table of Contents
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-
-A four-layer voice authentication system combining deepfake detection, phrase verification, speaker recognition, and adaptive voiceprint evolution.
-
-**[Live Demo](#demo)** | **[Documentation](#documentation)** | **[Installation](#installation)** | **[Architecture](ARCHITECTURE.md)** | **[Contributing](CONTRIBUTING.md)**
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Security Layers](#security-layers)
+- [Performance Metrics](#performance-metrics)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## Overview
 
+AAA Engine implements a multi-layered voice authentication pipeline designed to protect against modern attack vectors including AI-generated deepfakes, voice cloning, and replay attacks. The system processes audio through four sequential security checks before granting access.
+
+### Authentication Pipeline
+
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     AUTHENTICATION PIPELINE                          │
-│                                                                       │
-│  Audio ──► [L2: Deepfake] ──► [ASR: Phrase] ──► [L1: Speaker] ──►   │
-│             Detection          Verification      Verification        │
-│                                                                       │
-│         ──► [L3: Challenge + EMA Update]                             │
-│                                                                       │
-│  Reject:   spoof > 0.5      similarity < 0.6   score < 0.50         │
-│                                       token invalid/expired          │
-└─────────────────────────────────────────────────────────────────────┘
+Audio Input
+    |
+    v
++-------------------+     +-------------------+     +-------------------+
+|   Layer 2         |     |   ASR Layer       |     |   Layer 1         |
+|   Deepfake        | --> |   Phrase          | --> |   Speaker         |
+|   Detection       |     |   Verification    |     |   Verification    |
+|   (Wav2Vec2)      |     |   (Whisper)       |     |   (ECAPA-TDNN)    |
++-------------------+     +-------------------+     +-------------------+
+    |                         |                         |
+    | Reject if               | Reject if               | Reject if
+    | spoof > 0.5             | similarity < 0.6        | score < 0.5
+    v                         v                         v
++-------------------------------------------------------------------+
+|                        Layer 3                                     |
+|            Challenge-Response Token Validation                     |
+|                    + EMA Voiceprint Update                         |
++-------------------------------------------------------------------+
+                              |
+                              v
+                      Authentication Result
 ```
 
-### Key Features
+### Technology Stack
 
-- **99.2% Genuine Acceptance** — Low false rejection rate (L1 threshold: 0.50)
-- **95.8% Deepfake Rejection** — Wav2Vec2-based spoof detection
-- **98.1% Phrase Accuracy** — ASR-based challenge verification
-- **Zero Replay Attacks** — HMAC-SHA256 single-use tokens (90s TTL)
-- **Adaptive Voiceprints** — EMA evolution: `0.8 × old + 0.2 × new`
-- **Production-Ready** — Full-stack deployment with PostgreSQL persistence
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Backend | FastAPI 0.104+ | REST API framework |
+| Frontend | React 18 + Vite 5 | User interface |
+| Database | PostgreSQL 15 / SQLite | Data persistence |
+| L1 Model | ECAPA-TDNN (SpeechBrain) | Speaker embeddings (192-dim) |
+| L2 Model | Wav2Vec2 (HuggingFace) | Deepfake detection |
+| ASR Model | Whisper (OpenAI) | Speech-to-text |
+| Audio Processing | soundfile + scipy | 16kHz mono WAV |
+
+---
+
+## Key Features
+
+**High Accuracy**
+- 99.2% genuine user acceptance rate
+- 95.8% deepfake rejection rate
+- 98.1% phrase verification accuracy
+- 0.7% equal error rate (EER)
+
+**Security**
+- Zero replay attack vulnerability (single-use HMAC tokens with 90-second TTL)
+- Adaptive voiceprints using exponential moving average (EMA)
+- Four independent security layers with fail-fast design
+
+**Production Ready**
+- Docker containerization with multi-stage builds
+- PostgreSQL for production, SQLite for development
+- Comprehensive API documentation via FastAPI/Swagger
+- CORS configuration for cross-origin deployments
+
+---
+
+## Architecture
+
+The system follows a layered architecture with clear separation of concerns. For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+```
++------------------------------------------------------------------+
+|                          Client Layer                             |
+|  +------------------+              +------------------+           |
+|  | React Frontend   |              | Audio Recording  |           |
+|  | (Port 5173)      | <----------> | MediaRecorder    |           |
+|  +------------------+              +------------------+           |
++------------------------------------------------------------------+
+            |
+            | HTTP/REST (multipart/form-data)
+            v
++------------------------------------------------------------------+
+|                          API Layer                                |
+|  +------------+  +------------+  +------------+  +------------+   |
+|  | /auth/     |  | /auth/     |  | /auth/     |  | /auth/     |   |
+|  | register   |  | enroll     |  | challenge  |  | verify     |   |
+|  +------------+  +------------+  +------------+  +------------+   |
++------------------------------------------------------------------+
+            |
+            v
++------------------------------------------------------------------+
+|                       Processing Layer                            |
+|  +----------------+  +----------------+  +----------------+       |
+|  | layer2_        |  | layer3_asr.py  |  | layer1_        |       |
+|  | deepfake.py    |  | (Whisper)      |  | speaker.py     |       |
+|  | (Wav2Vec2)     |  |                |  | (ECAPA-TDNN)   |       |
+|  +----------------+  +----------------+  +----------------+       |
+|                                                                   |
+|  +--------------------------------------------------------+      |
+|  | layer3_adaptive.py                                      |      |
+|  | (Challenge Generation + Token Validation + EMA Update)  |      |
+|  +--------------------------------------------------------+      |
++------------------------------------------------------------------+
+            |
+            v
++------------------------------------------------------------------+
+|                      Persistence Layer                            |
+|  +----------+  +-------------+  +------------+  +------------+    |
+|  | users    |  | voiceprints |  | challenges |  | auth_logs  |    |
+|  +----------+  +-------------+  +------------+  +------------+    |
+|                                                                   |
+|                    PostgreSQL / SQLite                            |
++------------------------------------------------------------------+
+```
 
 ---
 
 ## Security Layers
 
-### Layer 2: Deepfake Detection (First Line of Defense)
-- **Model**: `garystafford/wav2vec2-deepfake-voice-detector`
-- **Purpose**: Detect synthetic/cloned voices (TTS, voice conversion, replay)
-- **Threshold**: Reject if spoof confidence > 0.5
-- **Trained On**: ASVspoof 2019 LA dataset
+### Layer 2: Deepfake Detection
 
-### Layer ASR: Phrase Verification (Second Line)
-- **Model**: OpenAI Whisper (base)
-- **Purpose**: Verify user spoke correct challenge phrase
-- **Threshold**: Reject if Levenshtein similarity < 0.6
-- **Defense**: Prevents replay attacks with wrong phrase
+**Purpose:** First line of defense against synthetic and manipulated audio.
 
-### Layer 1: Speaker Verification (Third Line)
-- **Model**: `speechbrain/spkrec-ecapa-voxceleb` (ECAPA-TDNN)
-- **Output**: 192-dimensional speaker embedding
-- **Threshold**: Reject if cosine similarity < 0.50
-- **Defense**: Confirms voice matches enrolled voiceprint
+| Property | Value |
+|----------|-------|
+| Model | `garystafford/wav2vec2-deepfake-voice-detector` |
+| Training Data | ASVspoof 2019 LA dataset |
+| Output | `bonafide` or `spoof` with confidence score |
+| Threshold | Reject if spoof confidence > 0.5 |
 
-### Layer 3: Challenge-Response + Adaptation (Final Line)
-- **Token**: HMAC-SHA256 signed (90s TTL, single-use)
-- **Adaptation**: EMA voiceprint update on success: `0.8 × old + 0.2 × new`
-- **Defense**: Prevents replay attacks, enables long-term adaptation
+**Implementation:** [backend/app/layer2_deepfake.py](backend/app/layer2_deepfake.py)
 
-## Tech Stack
+### ASR Layer: Phrase Verification
 
-| Component | Technology |
-|-----------|------------|
-| Backend | FastAPI + SQLAlchemy |
-| Frontend | React + Vite |
-| Database | PostgreSQL (Supabase) |
-| L1 Model | `speechbrain/spkrec-ecapa-voxceleb` |
-| L2 Model | `garystafford/wav2vec2-deepfake-voice-detector` |
-| Audio | WAV 16kHz mono (soundfile, no FFmpeg) |
+**Purpose:** Ensures the user speaks the correct challenge phrase, preventing replay attacks with pre-recorded audio.
 
-## Project Structure
+| Property | Value |
+|----------|-------|
+| Model | OpenAI Whisper (base) |
+| Comparison | Levenshtein similarity ratio |
+| Threshold | Reject if similarity < 0.6 |
 
+**Implementation:** [backend/app/layer3_asr.py](backend/app/layer3_asr.py)
+
+### Layer 1: Speaker Verification
+
+**Purpose:** Confirms the voice matches the enrolled voiceprint.
+
+| Property | Value |
+|----------|-------|
+| Model | `speechbrain/spkrec-ecapa-voxceleb` |
+| Embedding | 192-dimensional vector |
+| Metric | Cosine similarity normalized to [0, 1] |
+| Threshold | Reject if score < 0.5 |
+
+**Implementation:** [backend/app/layer1_speaker.py](backend/app/layer1_speaker.py)
+
+### Layer 3: Challenge-Response
+
+**Purpose:** Prevents token reuse and enables voiceprint adaptation.
+
+| Property | Value |
+|----------|-------|
+| Token Algorithm | HMAC-SHA256 |
+| Token TTL | 90 seconds |
+| Token Usage | Single-use (marked as used after verification) |
+| Voiceprint Update | EMA with alpha = 0.2 |
+
+**EMA Formula:**
 ```
-AAA_Baselines/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI orchestration (L2→L1→L3 pipeline)
-│   │   ├── db.py                # SQLAlchemy engine + session
-│   │   ├── models.py            # ORM models (User, Voiceprint, Challenge, AuthLog)
-│   │   ├── layer1_speaker.py    # Speaker verification (ECAPA-TDNN)
-│   │   ├── layer2_deepfake.py   # Deepfake detection (Wav2Vec2)
-│   │   └── layer3_adaptive.py   # Challenge-response + EMA updates
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/          # React pages (Register, Enroll, Verify, Dashboard)
-│   │   ├── api.js               # API client
-│   │   └── App.jsx              # Router
-│   └── package.json
-└── docs/
-    ├── TEAM_CONTRACT.md         # Team contract + API specs
-    └── DB_SCHEMA.sql            # Database schema
+new_voiceprint = 0.8 * old_voiceprint + 0.2 * current_embedding
 ```
+
+**Implementation:** [backend/app/layer3_adaptive.py](backend/app/layer3_adaptive.py)
 
 ---
 
 ## Performance Metrics
+
+### Accuracy
 
 | Metric | Value |
 |--------|-------|
@@ -120,61 +210,62 @@ AAA_Baselines/
 | Deepfake Rejection (L2) | 95.8% |
 | Phrase Verification (ASR) | 98.1% |
 | Speaker Verification (L1) | 99.2% |
-| Token Validation (L3) | 100% |
-| **False Rejection Rate (FRR)** | **0.8%** |
-| **False Acceptance Rate (FAR)** | **0.6%** |
-| **Equal Error Rate (EER)** | **0.7%** |
+| False Rejection Rate (FRR) | 0.8% |
+| False Acceptance Rate (FAR) | 0.6% |
+| Equal Error Rate (EER) | 0.7% |
 
-### Latency Breakdown
+### Latency
 
-| Layer | Operation | Latency |
-|-------|-----------|---------|
+| Layer | Operation | Time |
+|-------|-----------|------|
 | L2 | Deepfake Detection | ~420ms |
 | ASR | Phrase Verification | ~380ms |
-| L1 | Speaker Embeddings | ~290ms |
+| L1 | Speaker Verification | ~290ms |
 | L3 | Token Validation | ~5ms |
 | **Total** | **End-to-End** | **~1.1s** |
 
-*First request (cold start): 8-12s due to model loading*
+Note: First request incurs 8-12 second cold start for model loading.
 
 ---
 
 ## Quick Start
 
-### 1. Clone & Setup Environment
+### Prerequisites
+
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL 15+ (or use SQLite for development)
+
+### Installation
 
 ```bash
+# Clone repository
 git clone https://github.com/Speech-Synthesis/AAA_Baselines.git
 cd AAA_Baselines
-```
 
-### 2. Backend Setup
-
-```bash
+# Backend setup
 cd backend
-
-# Create virtual environment
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-
-# Install dependencies
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configure database
-cp .env.example .env
-# Edit .env with your Supabase/PostgreSQL connection string:
-# DATABASE_URL=postgresql://user:pass@host:5432/dbname
-```
-
-### 3. Frontend Setup
-
-```bash
-cd frontend
+# Frontend setup
+cd ../frontend
 npm install
 ```
 
-### 4. Run
+### Configuration
+
+Create `backend/.env`:
+
+```env
+DATABASE_URL=sqlite:///./aaa_engine.db
+SECRET_KEY=your-secret-key-here
+L3_HMAC_SECRET=your-hmac-secret-here
+DEBUG=true
+```
+
+### Running
 
 ```bash
 # Terminal 1: Backend (port 8000)
@@ -186,147 +277,140 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 in your browser.
 
-## API Endpoints
+For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /auth/register` | Register user | `{name, email}` → `{user_id}` |
-| `POST /auth/enroll` | Enroll voice | `user_id` + audio file → `{status, sample_count}` |
-| `GET /auth/challenge` | Get challenge | `?user_id=` → `{phrase, token, expires_at}` |
-| `POST /auth/verify` | Verify voice | `user_id, token` + audio → See response below |
-| `GET /users/{id}/voiceprint-history` | Get history | `[{updated_at, sample_count}]` |
+---
 
-### Verify Response
+## Project Structure
 
+```
+AAA_Baselines/
+|
++-- backend/
+|   +-- app/
+|   |   +-- main.py              # FastAPI application and routes
+|   |   +-- db.py                # Database engine configuration
+|   |   +-- models.py            # SQLAlchemy ORM models
+|   |   +-- layer1_speaker.py    # Speaker verification (ECAPA-TDNN)
+|   |   +-- layer2_deepfake.py   # Deepfake detection (Wav2Vec2)
+|   |   +-- layer3_adaptive.py   # Challenge generation and EMA
+|   |   +-- layer3_asr.py        # Phrase verification (Whisper)
+|   +-- requirements.txt         # Python dependencies
+|   +-- Dockerfile               # Backend container
+|
++-- frontend/
+|   +-- src/
+|   |   +-- components/          # React page components
+|   |   |   +-- RegisterPage.jsx
+|   |   |   +-- EnrollPage.jsx
+|   |   |   +-- VerifyPage.jsx
+|   |   |   +-- DashboardPage.jsx
+|   |   +-- api.js               # Backend API client
+|   |   +-- App.jsx              # Application router
+|   +-- package.json             # Node.js dependencies
+|   +-- Dockerfile               # Frontend container
+|
++-- docs/
+|   +-- DB_SCHEMA.sql            # Database schema reference
+|   +-- TEAM_CONTRACT.md         # Development team contract
+|
++-- docker-compose.yml           # Multi-container orchestration
++-- Dockerfile                   # Full-stack container
++-- render.yaml                  # Render deployment config
++-- ARCHITECTURE.md              # Technical architecture
++-- INSTALLATION.md              # Setup instructions
++-- CONTRIBUTING.md              # Contribution guidelines
++-- CHANGELOG.md                 # Version history
++-- DEMO.md                      # Demo walkthrough
++-- LICENSE                      # MIT License
+```
+
+---
+
+## API Reference
+
+Base URL: `http://localhost:8000`
+
+Interactive documentation: `http://localhost:8000/docs`
+
+### Endpoints
+
+#### POST /auth/register
+
+Register a new user.
+
+**Request:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+#### POST /auth/enroll
+
+Enroll a voice sample for the user.
+
+**Request:** `multipart/form-data`
+- `user_id`: User UUID
+- `audio`: WAV file (16kHz mono recommended)
+
+**Response:**
+```json
+{
+  "status": "enrolled",
+  "sample_count": 3
+}
+```
+
+#### GET /auth/challenge
+
+Request an authentication challenge.
+
+**Request:** `?user_id=<uuid>`
+
+**Response:**
+```json
+{
+  "phrase": "blue sky mountain river",
+  "token": "eyJ0eXAiOiJKV1Q...",
+  "expires_at": "2024-01-15T14:32:45Z"
+}
+```
+
+#### POST /auth/verify
+
+Verify authentication attempt.
+
+**Request:** `multipart/form-data`
+- `user_id`: User UUID
+- `token`: Challenge token
+- `audio`: WAV file with spoken phrase
+
+**Response:**
 ```json
 {
   "result": "ACCEPT",
-  "confidence": 0.85,
+  "confidence": 0.87,
   "layer_blocked": null,
   "session_id": "uuid",
   "reason": "Authentication successful",
   "l2_label": "bonafide",
-  "l2_confidence": 0.92,
-  "l1_score": 0.85
+  "l2_confidence": 0.94,
+  "l1_score": 0.87,
+  "asr_transcript": "blue sky mountain river",
+  "asr_similarity": 0.98
 }
 ```
-
-## Authentication Flow
-
-```
-1. REGISTER    →  User provides name + email
-2. ENROLL      →  Record 3+ seconds of speech → creates 192-dim embedding
-3. CHALLENGE   →  Request challenge phrase + token (90s TTL)
-4. VERIFY      →  Submit audio + token:
-                   └─► L2: Check for deepfake/spoof (reject if confidence > 0.5)
-                   └─► L1: Compare speaker embedding (reject if similarity < 0.7)
-                   └─► L3: Validate token + update voiceprint with EMA
-```
-
-## EMA Voiceprint Adaptation
-
-On each successful authentication, the stored voiceprint is updated:
-
-```python
-new_embedding = 0.8 * old_embedding + 0.2 * current_embedding
-```
-
-This allows the system to adapt to gradual voice changes over time while maintaining stability.
-
-**Implementation**: `backend/app/layer3_adaptive.py:134-164`
-
-```python
-def update_voiceprint(old_embedding, new_embedding, alpha=0.2):
-    return [(1.0 - alpha) * old + alpha * new
-            for old, new in zip(old_embedding, new_embedding)]
-```
-
-**Called in**:
-- `main.py:129` — During enrollment (updates existing voiceprint)
-- `main.py:289` — After successful verification
-
-## Thresholds
-
-| Layer | Threshold | Action |
-|-------|-----------|--------|
-| L2 Spoof | > 0.5 | Reject (deepfake detected) |
-| L1 Similarity | < 0.7 | Reject (speaker mismatch) |
-| L3 Token | expired/used/invalid | Reject (token failed) |
-
-## Database Schema
-
-```sql
-users (id, name, email, created_at)
-voiceprints (id, user_id, embedding[192], sample_count, updated_at)
-challenges (id, user_id, phrase, token, expires_at, used)
-auth_logs (id, user_id, challenge_id, l2_label, l2_confidence, l1_score, result, layer_blocked, created_at)
-```
-
-## Models
-
-### Layer 1: Speaker Verification
-- **Model**: `speechbrain/spkrec-ecapa-voxceleb`
-- **Output**: 192-dimensional embedding
-- **Metric**: Cosine similarity (normalized to 0-1)
-
-### Layer 2: Deepfake Detection
-- **Model**: `garystafford/wav2vec2-deepfake-voice-detector`
-- **Labels**: `{0: 'real', 1: 'fake'}` → mapped to `bonafide/spoof`
-- **Note**: Modern high-quality TTS (ElevenLabs, etc.) may evade detection — this is a known limitation of current deepfake detection models
-
-## Audio Requirements
-
-- **Format**: WAV
-- **Sample Rate**: 16kHz (auto-resampled if different)
-- **Channels**: Mono (auto-converted if stereo)
-- **Duration**:
-  - Enrollment: minimum 3 seconds
-  - Verification: minimum 2-3 seconds
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [INSTALLATION.md](INSTALLATION.md) | Complete setup guide (dev & production) |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical deep dive into system design |
-| [DEMO.md](DEMO.md) | Step-by-step demo guide with sample outputs |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines & coding standards |
-| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
-| [API Docs](http://localhost:8000/docs) | Auto-generated FastAPI documentation |
-
----
-
-## Demo
-
-### Live Demo (if deployed)
-**URL**: [https://aaa-engine-demo.fly.dev](https://aaa-engine-demo.fly.dev) *(replace with actual URL)*
-
-### Video Walkthrough
-See [DEMO.md](DEMO.md) for complete demonstration guide with sample outputs.
-
-**Quick Test** (30 seconds):
-1. Open http://localhost:5173
-2. Register → Enroll (3 samples) → Get Challenge → Verify
-3. View authentication result with layer-wise metrics
-
----
-
-## Tech Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Frontend** | React 18 + Vite | User interface |
-| **Backend** | FastAPI + SQLAlchemy | REST API + ORM |
-| **Database** | PostgreSQL 15 | Data persistence |
-| **L2 Model** | Wav2Vec2 | Deepfake detection |
-| **ASR Model** | Whisper | Speech-to-text |
-| **L1 Model** | ECAPA-TDNN | Speaker embeddings |
-| **Audio** | soundfile + librosa | Audio processing |
-| **Deployment** | Fly.io / Docker | Container hosting |
 
 ---
 
@@ -334,107 +418,85 @@ See [DEMO.md](DEMO.md) for complete demonstration guide with sample outputs.
 
 ### Environment Variables
 
-**Backend** (`.env`):
-```env
-DATABASE_URL=postgresql://user:password@host:5432/database
-SECRET_KEY=your-secret-key-change-in-production
-L3_HMAC_SECRET=your-hmac-secret-for-tokens
-DEBUG=false
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | Database connection string | `sqlite:///./aaa_engine.db` |
+| `SECRET_KEY` | Application secret key | Required |
+| `L3_HMAC_SECRET` | HMAC secret for token signing | Required |
+| `DEBUG` | Enable debug mode | `false` |
 
-**Frontend** (`src/api.js`):
-```javascript
-// Auto-detects localhost vs production
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
-  : 'https://aaa-backend.onrender.com';
-```
+### Thresholds
 
-### Thresholds (Tunable)
+Thresholds are configured in `backend/app/main.py`:
 
-Located in `backend/app/main.py:46-49`:
 ```python
-L2_SPOOF_THRESHOLD = 0.5   # Deepfake rejection
-L1_SIMILARITY_THRESHOLD = 0.50  # Speaker matching
-ASR_PHRASE_THRESHOLD = 0.6  # Phrase similarity
+L2_SPOOF_THRESHOLD = 0.5      # Deepfake rejection threshold
+L1_SIMILARITY_THRESHOLD = 0.5  # Speaker matching threshold
+ASR_PHRASE_THRESHOLD = 0.6     # Phrase similarity threshold
 ```
+
+---
+
+## Deployment
+
+### Docker (Recommended)
+
+```bash
+# Build and run
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+### Render
+
+The repository includes `render.yaml` for one-click deployment on Render.
+
+1. Connect your GitHub repository to Render
+2. Render will auto-detect the configuration
+3. Set environment variables in Render dashboard
+
+For detailed deployment instructions, see [INSTALLATION.md](INSTALLATION.md).
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design and technical details |
+| [INSTALLATION.md](INSTALLATION.md) | Setup and deployment guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [DEMO.md](DEMO.md) | Demo walkthrough with examples |
+| [docs/DB_SCHEMA.sql](docs/DB_SCHEMA.sql) | Database schema |
 
 ---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
-### Quick Contribution Steps
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m 'feat: add feature'`
-4. Push to branch: `git push origin feature/your-feature`
-5. Open Pull Request
-
-### Development Setup
-```bash
-# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pytest  # Run tests
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## Team
-
-| Name | Role | Branch (Historical) |
-|------|------|---------------------|
-| **Navadeep** | Infrastructure + Backend Orchestration | `infra-backend` |
-| **Surya** | Layer 1 (Speaker Verification) | `layer1-speaker` |
-| **Nandan** | Layer 2 (Deepfake Detection) | `layer2-deepfake` |
-| **Aditya** | Layer 3 + Frontend | `layer3-frontend` |
+- Code style and standards
+- Commit message format
+- Pull request process
+- Testing requirements
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-Copyright (c) 2026 AAA Engine Team
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
 ## Acknowledgments
 
-- **SpeechBrain** for ECAPA-TDNN speaker verification model
-- **Hugging Face** for Wav2Vec2 deepfake detection model
-- **OpenAI** for Whisper ASR model
-- **ASVspoof Challenge** for deepfake detection datasets
-
----
-
-## Contact & Support
-
-- **Issues**: [GitHub Issues](https://github.com/Speech-Synthesis/AAA_Baselines/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Speech-Synthesis/AAA_Baselines/discussions)
-- **Documentation**: [Full Docs](https://github.com/Speech-Synthesis/AAA_Baselines/wiki)
-
----
-
-## Roadmap
-
-- [ ] GPU acceleration for model inference
-- [ ] Multilingual support (99 languages via Whisper)
-- [ ] Mobile app (React Native)
-- [ ] Real-time streaming authentication
-- [ ] User analytics dashboard
-- [ ] Active learning for voiceprint adaptation
-- [ ] Federated learning for privacy-preserving model updates
-
----
-
-**Star this repo if you find it useful!**
+- [SpeechBrain](https://speechbrain.github.io/) for ECAPA-TDNN speaker verification
+- [Hugging Face](https://huggingface.co/) for Wav2Vec2 deepfake detection model
+- [OpenAI](https://openai.com/) for Whisper ASR model
+- [ASVspoof Challenge](https://www.asvspoof.org/) for deepfake detection datasets

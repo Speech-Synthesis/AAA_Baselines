@@ -2,335 +2,379 @@
 
 Technical deep dive into AAA Engine's system architecture, data flow, and implementation details.
 
+---
+
 ## Table of Contents
+
 - [System Overview](#system-overview)
 - [Authentication Pipeline](#authentication-pipeline)
-- [Layer Details](#layer-details)
+- [Layer Implementations](#layer-implementations)
 - [Database Design](#database-design)
 - [API Architecture](#api-architecture)
 - [Security Model](#security-model)
-- [Performance Optimization](#performance-optimization)
+- [Performance Considerations](#performance-considerations)
+- [Scalability](#scalability)
 
 ---
 
 ## System Overview
 
+### Design Principles
+
+1. **Defense in Depth:** Multiple independent security layers, each capable of rejecting malicious attempts
+2. **Fail-Fast:** Early rejection at cheaper layers reduces computational cost
+3. **Adaptability:** Voiceprints evolve over time to accommodate natural voice changes
+4. **Modularity:** Each layer is independently testable and replaceable
+
 ### High-Level Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                         CLIENT LAYER                          │
-│                                                               │
-│  ┌────────────────┐         ┌────────────────┐              │
-│  │  React Frontend │◄──────►│  Microphone    │              │
-│  │  (Port 5173)    │         │  Input         │              │
-│  └────────┬───────┘         └────────────────┘              │
-│           │ HTTP/HTTPS                                        │
-└───────────┼──────────────────────────────────────────────────┘
-            │
-            │ REST API (FormData multipart/form-data)
-            │
-┌───────────▼──────────────────────────────────────────────────┐
-│                       API LAYER (FastAPI)                     │
-│                                                               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │ Register │  │  Enroll  │  │ Challenge│  │  Verify  │    │
-│  │  /auth/  │  │  /auth/  │  │  /auth/  │  │  /auth/  │    │
-│  │ register │  │ enroll   │  │ challenge│  │  verify  │    │
-│  └──────────┘  └────┬─────┘  └─────┬────┘  └────┬─────┘    │
-│                      │              │             │           │
-└──────────────────────┼──────────────┼─────────────┼──────────┘
-                       │              │             │
-                       ▼              ▼             ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    PROCESSING LAYER                           │
-│                                                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   Layer 2   │  │   Layer ASR │  │   Layer 1   │          │
-│  │  Deepfake   │  │   Phrase    │  │   Speaker   │          │
-│  │  Detection  │  │   Verify    │  │  Embeddings │          │
-│  │  (Wav2Vec2) │  │  (Whisper)  │  │  (ECAPA)    │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
-│                                                               │
-│  ┌─────────────┐                                             │
-│  │   Layer 3   │                                             │
-│  │  Challenge  │                                             │
-│  │  + EMA      │                                             │
-│  │  (HMAC)     │                                             │
-│  └─────────────┘                                             │
-└───────────────────────────┬───────────────────────────────────┘
-                            │
-                            ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    PERSISTENCE LAYER                          │
-│                                                               │
-│  ┌─────────┐  ┌─────────────┐  ┌───────────┐  ┌──────────┐ │
-│  │  Users  │  │ Voiceprints │  │ Challenges│  │ AuthLogs │ │
-│  └─────────┘  └─────────────┘  └───────────┘  └──────────┘ │
-│                                                               │
-│            PostgreSQL Database (Supabase)                     │
-└──────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------------+
+|                              CLIENT LAYER                               |
+|                                                                         |
+|   +---------------------+                  +---------------------+      |
+|   |   React Frontend    | <--------------> |   Audio Recording   |      |
+|   |   (Vite, Port 5173) |                  |   (MediaRecorder)   |      |
+|   +---------------------+                  +---------------------+      |
+|              |                                                          |
++------------------------------------------------------------------------+
+               |
+               | HTTP/HTTPS REST API
+               | Content-Type: multipart/form-data
+               |
++------------------------------------------------------------------------+
+|                              API LAYER                                  |
+|                           FastAPI (Port 8000)                           |
+|                                                                         |
+|   +------------+   +------------+   +-------------+   +------------+   |
+|   | POST       |   | POST       |   | GET         |   | POST       |   |
+|   | /auth/     |   | /auth/     |   | /auth/      |   | /auth/     |   |
+|   | register   |   | enroll     |   | challenge   |   | verify     |   |
+|   +------------+   +-----+------+   +------+------+   +-----+------+   |
+|                          |                 |               |            |
++------------------------------------------------------------------------+
+                           |                 |               |
+                           v                 v               v
++------------------------------------------------------------------------+
+|                          PROCESSING LAYER                               |
+|                                                                         |
+|   +------------------+   +------------------+   +------------------+    |
+|   | layer2_deepfake  |   | layer3_asr       |   | layer1_speaker   |    |
+|   | .py              |   | .py              |   | .py              |    |
+|   |                  |   |                  |   |                  |    |
+|   | Wav2Vec2         |   | Whisper ASR      |   | ECAPA-TDNN       |    |
+|   | Deepfake         |   | Phrase           |   | Speaker          |    |
+|   | Detection        |   | Verification     |   | Embeddings       |    |
+|   +------------------+   +------------------+   +------------------+    |
+|                                                                         |
+|   +------------------------------------------------------------------+ |
+|   | layer3_adaptive.py                                                | |
+|   |                                                                    | |
+|   | - generate_challenge(): Create HMAC-signed challenge tokens        | |
+|   | - verify_token(): Validate token expiry and single-use             | |
+|   | - update_voiceprint(): EMA-based voiceprint adaptation             | |
+|   +------------------------------------------------------------------+ |
+|                                                                         |
++------------------------------------------------------------------------+
+               |
+               v
++------------------------------------------------------------------------+
+|                         PERSISTENCE LAYER                               |
+|                                                                         |
+|   +-------------+   +---------------+   +--------------+   +----------+ |
+|   | users       |   | voiceprints   |   | challenges   |   | auth_logs| |
+|   |             |   |               |   |              |   |          | |
+|   | id (PK)     |   | id (PK)       |   | id (PK)      |   | id (PK)  | |
+|   | name        |   | user_id (FK)  |   | user_id (FK) |   | user_id  | |
+|   | email       |   | embedding[192]|   | phrase       |   | result   | |
+|   | created_at  |   | sample_count  |   | token        |   | l2_label | |
+|   |             |   | updated_at    |   | expires_at   |   | l1_score | |
+|   +-------------+   +---------------+   +--------------+   +----------+ |
+|                                                                         |
+|                    PostgreSQL / SQLite (SQLAlchemy ORM)                 |
++------------------------------------------------------------------------+
 ```
-
-### Technology Stack
-
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| Frontend | React | 18.x | User interface |
-| Build Tool | Vite | 5.x | Frontend bundling |
-| HTTP Client | Axios | 1.x | API communication |
-| Backend | FastAPI | 0.104.x | REST API framework |
-| ORM | SQLAlchemy | 2.x | Database abstraction |
-| Database | PostgreSQL | 15.x | Data persistence |
-| L1 Model | ECAPA-TDNN | speechbrain | Speaker embeddings |
-| L2 Model | Wav2Vec2 | transformers | Deepfake detection |
-| ASR Model | Whisper | openai-whisper | Speech-to-text |
-| Audio | soundfile | 0.12.x | Audio I/O |
-| Deployment | Fly.io | - | Container hosting |
 
 ---
 
 ## Authentication Pipeline
 
-### Complete Flow Diagram
+### Enrollment Flow
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                  ENROLLMENT PHASE                             │
-│                                                               │
-│  User ──► Record Voice (3+ samples)                          │
-│              │                                                │
-│              ▼                                                │
-│         L1: Extract ECAPA Embedding (192-dim)                │
-│              │                                                │
-│              ▼                                                │
-│         Store/Update Voiceprint (EMA if existing)            │
-│              │                                                │
-│              ▼                                                │
-│         Sample Count += 1                                    │
-└──────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────┐
-│               VERIFICATION PHASE                              │
-│                                                               │
-│  Step 1: GET /auth/challenge?user_id=<uuid>                  │
-│          ├─► Generate random phrase                          │
-│          ├─► Create HMAC token (90s TTL)                     │
-│          └─► Store in challenges table                       │
-│                                                               │
-│  Step 2: User records audio speaking phrase                  │
-│                                                               │
-│  Step 3: POST /auth/verify                                   │
-│          user_id + token + audio.wav                         │
-│              │                                                │
-│              ▼                                                │
-│         ┌─────────────────┐                                  │
-│         │  L2: Deepfake   │  Wav2Vec2 inference              │
-│         │  Detection      │  ➜ bonafide/spoof                │
-│         └────────┬────────┘                                  │
-│                  │                                            │
-│                  ├─► if spoof confidence > 0.5:              │
-│                  │   REJECT (layer_blocked=2)                │
-│                  │                                            │
-│                  ▼                                            │
-│         ┌─────────────────┐                                  │
-│         │  ASR: Phrase    │  Whisper transcription           │
-│         │  Verification   │  ➜ compare vs expected          │
-│         └────────┬────────┘                                  │
-│                  │                                            │
-│                  ├─► if similarity < 0.6:                    │
-│                  │   REJECT (layer_blocked=4)                │
-│                  │                                            │
-│                  ▼                                            │
-│         ┌─────────────────┐                                  │
-│         │  L1: Speaker    │  ECAPA embedding extraction      │
-│         │  Verification   │  ➜ cosine similarity            │
-│         └────────┬────────┘                                  │
-│                  │                                            │
-│                  ├─► if similarity < 0.50:                   │
-│                  │   REJECT (layer_blocked=1)                │
-│                  │                                            │
-│                  ▼                                            │
-│         ┌─────────────────┐                                  │
-│         │  L3: Token      │  HMAC validation                 │
-│         │  Validation     │  ➜ check expiry, usage          │
-│         └────────┬────────┘                                  │
-│                  │                                            │
-│                  ├─► if invalid/expired:                     │
-│                  │   REJECT (layer_blocked=3)                │
-│                  │                                            │
-│                  ▼                                            │
-│         ✅ ACCEPT                                             │
-│         ├─► Update voiceprint (EMA: 0.8*old + 0.2*new)      │
-│         ├─► Mark token as used                               │
-│         ├─► Log success in auth_logs                         │
-│         └─► Return session_id + metrics                      │
-└──────────────────────────────────────────────────────────────┘
+User Registration
+       |
+       v
++------------------+
+| POST /auth/      |
+| register         |
+| {name, email}    |
++--------+---------+
+         |
+         v
+   Create User Record
+   Return user_id
+         |
+         v
++------------------+
+| POST /auth/      |
+| enroll           |
+| user_id + audio  |
++--------+---------+
+         |
+         v
++------------------+
+| Layer 1:         |
+| Extract ECAPA    |
+| Embedding        |
+| (192-dim vector) |
++--------+---------+
+         |
+         +---> First sample? ---> Create voiceprint record
+         |
+         +---> Existing voiceprint? ---> EMA update:
+                                         new = 0.8 * old + 0.2 * current
+         |
+         v
+   Increment sample_count
+   Return {status, sample_count}
 ```
 
-### Sequential Layer Execution
+### Verification Flow
 
-**Key Design Decision**: Layers execute sequentially, not in parallel.
-
-**Rationale**:
-1. **Early Rejection**: Stop processing if deepfake detected (saves compute)
-2. **Attack Surface**: Don't leak speaker info if deepfake suspected
-3. **Cost Optimization**: L2 (420ms) cheaper than L1 (290ms) + L2 combined
-
-**Execution Order**:
-```python
-# backend/app/main.py:227-405
-
-# 1. L2: Deepfake Detection (cheapest to run first)
-l2_result = detect_spoof(audio_bytes)
-if l2_result["label"] == "spoof" and l2_result["confidence"] > 0.5:
-    return REJECT(layer_blocked=2)
-
-# 2. ASR: Phrase Verification (before revealing speaker identity)
-asr_match, similarity, transcript = verify_phrase(audio_bytes, expected_phrase)
-if not asr_match:
-    return REJECT(layer_blocked=4)
-
-# 3. L1: Speaker Verification (most expensive, run if L2 passes)
-l1_result = verify_speaker(audio_bytes, voiceprint.embedding)
-if l1_result["score"] < 0.50:
-    return REJECT(layer_blocked=1)
-
-# 4. L3: Token Validation (final check)
-if not verify_token(token):
-    return REJECT(layer_blocked=3)
-
-# All layers passed → ACCEPT
 ```
++---------------------------+
+| GET /auth/challenge       |
+| ?user_id=<uuid>           |
++-------------+-------------+
+              |
+              v
+    +-------------------+
+    | Generate Random   |
+    | 4-Word Phrase     |
+    | from word list    |
+    +-------------------+
+              |
+              v
+    +-------------------+
+    | Create HMAC Token |
+    | Message: user_id  |
+    |   + phrase        |
+    |   + expires_at    |
+    | Secret: L3_HMAC   |
+    +-------------------+
+              |
+              v
+    Store in challenges table
+    Return {phrase, token, expires_at}
+              |
+              v
++---------------------------+
+| POST /auth/verify         |
+| user_id + token + audio   |
++-------------+-------------+
+              |
+              v
++---------------------------+     +---------------------------+
+| LAYER 2: Deepfake Check   |     | If spoof confidence > 0.5 |
+| Wav2Vec2 Classification   | --> | REJECT                    |
+| Output: bonafide/spoof    |     | layer_blocked = 2         |
++-------------+-------------+     +---------------------------+
+              |
+              | Pass
+              v
++---------------------------+     +---------------------------+
+| ASR: Phrase Verification  |     | If similarity < 0.6       |
+| Whisper Transcription     | --> | REJECT                    |
+| Levenshtein Similarity    |     | layer_blocked = 4         |
++-------------+-------------+     +---------------------------+
+              |
+              | Pass
+              v
++---------------------------+     +---------------------------+
+| LAYER 1: Speaker Verify   |     | If score < 0.5            |
+| ECAPA Embedding Extract   | --> | REJECT                    |
+| Cosine Similarity         |     | layer_blocked = 1         |
++-------------+-------------+     +---------------------------+
+              |
+              | Pass
+              v
++---------------------------+     +---------------------------+
+| LAYER 3: Token Validation |     | If invalid/expired/used   |
+| Check expiry (90s TTL)    | --> | REJECT                    |
+| Check single-use          |     | layer_blocked = 3         |
++-------------+-------------+     +---------------------------+
+              |
+              | Pass
+              v
+    +-------------------+
+    | ACCEPT            |
+    | - Mark token used |
+    | - EMA update      |
+    |   voiceprint      |
+    | - Log success     |
+    +-------------------+
+```
+
+### Sequential Execution Rationale
+
+Layers execute sequentially, not in parallel, for these reasons:
+
+1. **Cost Optimization:** Cheapest checks run first (L2 ~420ms is faster to run before L1 extraction)
+2. **Security:** Avoid revealing speaker information if deepfake is detected
+3. **Early Termination:** Stop processing immediately on rejection
 
 ---
 
-## Layer Details
+## Layer Implementations
 
 ### Layer 2: Deepfake Detection
 
-**File**: `backend/app/layer2_deepfake.py:1-52`
+**File:** `backend/app/layer2_deepfake.py`
 
-**Model**: `garystafford/wav2vec2-deepfake-voice-detector`
+**Model:** `garystafford/wav2vec2-deepfake-voice-detector`
 
-**Implementation**:
+**Architecture:**
+```
+Audio Input (16kHz mono)
+       |
+       v
++------------------+
+| Wav2Vec2         |
+| Feature          |
+| Extractor        |
++--------+---------+
+         |
+         v
++------------------+
+| Transformer      |
+| Encoder          |
+| (12 layers)      |
++--------+---------+
+         |
+         v
++------------------+
+| Classification   |
+| Head             |
+| (2 classes)      |
++--------+---------+
+         |
+         v
+   Softmax --> bonafide (0) / spoof (1)
+```
+
+**Function Signature:**
 ```python
-from transformers import AutoModelForAudioClassification, Wav2Vec2Processor
-import torch
-
-# Load model (cached after first run)
-model = AutoModelForAudioClassification.from_pretrained(MODEL_NAME)
-processor = Wav2Vec2Processor.from_pretrained(MODEL_NAME)
-
 def detect_spoof(audio_bytes: bytes) -> dict:
     """
-    Classify audio as bonafide (real) or spoof (fake).
+    Classify audio as genuine or synthetic.
+
+    Args:
+        audio_bytes: Raw WAV audio data
 
     Returns:
         {
             "label": "bonafide" | "spoof",
-            "confidence": float  # Probability of predicted label
+            "confidence": float  # 0.0 to 1.0
         }
     """
-    # Load audio (auto-resample to 16kHz)
-    audio, sr = sf.read(io.BytesIO(audio_bytes))
-    if sr != 16000:
-        audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
-
-    # Preprocess
-    inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
-
-    # Inference
-    with torch.no_grad():
-        logits = model(**inputs).logits
-        probs = torch.nn.functional.softmax(logits, dim=-1)[0]
-
-    # Map output (0: real, 1: fake)
-    predicted_id = probs.argmax().item()
-    label_map = {0: "bonafide", 1: "spoof"}
-
-    return {
-        "label": label_map[predicted_id],
-        "confidence": probs[predicted_id].item()
-    }
 ```
 
-**Training Data**: ASVspoof 2019 LA (Logical Access) dataset
-- **Bonafide**: Real human speech
-- **Spoof**: TTS-generated, voice-converted, replay attacks
-
-**Limitations**:
-- Trained on 2019 TTS systems (pre-GPT era)
-- May not detect modern systems (ElevenLabs, Vall-E, XTTS)
-- Adversarial examples possible
-
-**Threshold**: 0.5 (chosen via ROC curve on validation set)
+**Limitations:**
+- Trained on ASVspoof 2019 data (pre-modern TTS systems)
+- May not detect latest generation TTS (ElevenLabs, VALL-E, XTTS)
+- Adversarial examples remain a concern
 
 ---
 
-### Layer ASR: Phrase Verification
+### ASR Layer: Phrase Verification
 
-**File**: `backend/app/layer3_asr.py:1-65`
+**File:** `backend/app/layer3_asr.py`
 
-**Model**: OpenAI Whisper (base)
+**Model:** OpenAI Whisper (base, 74M parameters)
 
-**Implementation**:
+**Process:**
+```
+Audio Input
+       |
+       v
++------------------+
+| Whisper ASR      |
+| Transcription    |
++--------+---------+
+         |
+         v
++------------------+
+| Text Cleanup     |
+| - Lowercase      |
+| - Strip spaces   |
++--------+---------+
+         |
+         v
++------------------+
+| Levenshtein      |
+| Similarity       |
+| Ratio            |
++--------+---------+
+         |
+         v
+   Compare to expected phrase
+   Return (match, similarity, transcript)
+```
+
+**Function Signature:**
 ```python
-import whisper
-from difflib import SequenceMatcher
-
-# Load Whisper model
-model = whisper.load_model("base")
-
-def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float) -> tuple:
+def verify_phrase(
+    audio_bytes: bytes,
+    expected_phrase: str,
+    threshold: float
+) -> tuple[bool, float, str]:
     """
-    Transcribe audio and compare to expected phrase.
+    Verify spoken phrase matches expected phrase.
 
     Returns:
         (match: bool, similarity: float, transcript: str)
     """
-    # Save audio temporarily (Whisper needs file path)
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
-
-    # Transcribe
-    result = model.transcribe(tmp_path)
-    transcript = result["text"].strip().lower()
-
-    # Cleanup
-    os.unlink(tmp_path)
-
-    # Compare using Levenshtein similarity
-    expected_clean = expected_phrase.strip().lower()
-    similarity = SequenceMatcher(None, expected_clean, transcript).ratio()
-
-    return (similarity >= threshold, similarity, transcript)
 ```
-
-**Threshold**: 0.6 (allows minor transcription errors like "the" vs "a")
-
-**Purpose**: Prevents replay attacks where attacker uses recorded audio of different phrase
 
 ---
 
 ### Layer 1: Speaker Verification
 
-**File**: `backend/app/layer1_speaker.py:1-78`
+**File:** `backend/app/layer1_speaker.py`
 
-**Model**: `speechbrain/spkrec-ecapa-voxceleb`
+**Model:** `speechbrain/spkrec-ecapa-voxceleb` (ECAPA-TDNN)
 
-**Implementation**:
+**Architecture:**
+```
+Audio Input (16kHz mono)
+       |
+       v
++----------------------+
+| Mel Spectrogram      |
+| Extraction           |
++----------+-----------+
+           |
+           v
++----------------------+
+| ECAPA-TDNN Encoder   |
+| - SE-Res2Net blocks  |
+| - Channel attention  |
+| - Temporal attention |
++----------+-----------+
+           |
+           v
++----------------------+
+| Statistics Pooling   |
+| (mean + std)         |
++----------+-----------+
+           |
+           v
+   192-dimensional embedding
+```
+
+**Function Signatures:**
 ```python
-from speechbrain.pretrained import EncoderClassifier
-import torch
-
-# Load ECAPA-TDNN model
-classifier = EncoderClassifier.from_hparams(
-    source="speechbrain/spkrec-ecapa-voxceleb",
-    savedir="pretrained_models/spkrec-ecapa-voxceleb"
-)
-
 def enroll_speaker(audio_bytes: bytes) -> dict:
     """
     Extract speaker embedding from audio.
@@ -338,150 +382,89 @@ def enroll_speaker(audio_bytes: bytes) -> dict:
     Returns:
         {"embedding": list[float]}  # 192-dimensional
     """
-    # Load audio
-    audio, sr = sf.read(io.BytesIO(audio_bytes))
-    if sr != 16000:
-        audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
 
-    # Extract embedding
-    signal = torch.tensor(audio).unsqueeze(0)
-    with torch.no_grad():
-        embedding = classifier.encode_batch(signal)
-
-    return {"embedding": embedding.squeeze(0).tolist()}
-
-
-def verify_speaker(audio_bytes: bytes, enrolled_embedding: list[float]) -> dict:
+def verify_speaker(
+    audio_bytes: bytes,
+    stored_embedding: list[float]
+) -> dict:
     """
-    Compare current audio to enrolled voiceprint.
+    Compare audio to stored voiceprint.
 
     Returns:
         {
-            "score": float,  # Cosine similarity [0, 1]
-            "embedding": list[float]  # For EMA update
+            "score": float,      # Cosine similarity [0, 1]
+            "embedding": list    # For EMA update
         }
     """
-    # Extract embedding from current audio
-    result = enroll_speaker(audio_bytes)
-    current_embedding = result["embedding"]
-
-    # Compute cosine similarity
-    enrolled_tensor = torch.tensor(enrolled_embedding)
-    current_tensor = torch.tensor(current_embedding)
-
-    similarity = torch.nn.functional.cosine_similarity(
-        enrolled_tensor.unsqueeze(0),
-        current_tensor.unsqueeze(0)
-    ).item()
-
-    # Normalize to [0, 1] (cosine similarity is [-1, 1])
-    score = (similarity + 1) / 2
-
-    return {"score": score, "embedding": current_embedding}
 ```
 
-**Embedding Dimension**: 192 (fixed by ECAPA-TDNN architecture)
-
-**Threshold History**:
-- Initial: 0.7 (high security, some false rejections)
-- Current: 0.50 (balanced based on testing)
+**Similarity Calculation:**
+```python
+# Cosine similarity ranges from -1 to 1
+# Normalize to 0-1 range for threshold comparison
+raw_similarity = cosine_similarity(enrolled, current)
+score = (raw_similarity + 1) / 2
+```
 
 ---
 
-### Layer 3: Challenge-Response + EMA
+### Layer 3: Challenge-Response and Adaptation
 
-**File**: `backend/app/layer3_adaptive.py:1-164`
+**File:** `backend/app/layer3_adaptive.py`
 
-**Challenge Generation**:
+**Challenge Generation:**
 ```python
-import hmac
-import hashlib
-import secrets
-from datetime import datetime, timedelta
-
-# Word list for phrase generation
 WORD_LIST = [
     "apple", "blue", "cloud", "delta", "eagle", "forest",
     "guitar", "house", "island", "jungle", "king", "lion",
-    # ... (50 words total)
+    # ... 50 words total
 ]
 
 def generate_challenge(user_id: str) -> dict:
-    """
-    Generate random challenge phrase with HMAC token.
+    # Select 4 random words
+    phrase = " ".join(random.sample(WORD_LIST, 4))
 
-    Returns:
-        {
-            "phrase": str,  # Random 4-word phrase
-            "token": str,   # HMAC-SHA256 signature
-            "expires_at": datetime  # Current time + 90s
-        }
-    """
-    # Generate random phrase (4 words)
-    phrase_words = secrets.SystemRandom().sample(WORD_LIST, 4)
-    phrase = " ".join(phrase_words)
-
-    # Create expiry timestamp
+    # Set expiration (90 seconds)
     expires_at = datetime.utcnow() + timedelta(seconds=90)
 
     # Generate HMAC token
     message = f"{user_id}:{phrase}:{expires_at.isoformat()}"
-    secret_key = os.getenv("L3_HMAC_SECRET").encode()
-    token = hmac.new(secret_key, message.encode(), hashlib.sha256).hexdigest()
+    token = hmac.new(
+        SECRET_KEY.encode(),
+        message.encode(),
+        hashlib.sha256
+    ).hexdigest()
 
     return {
         "phrase": phrase,
         "token": token,
         "expires_at": expires_at
     }
-
-
-def verify_token(token: str) -> bool:
-    """
-    Validate HMAC token (check expiry, single-use).
-
-    Returns:
-        bool: True if valid, False otherwise
-    """
-    # Lookup in database
-    challenge = db.query(Challenge).filter(Challenge.token == token).first()
-
-    if not challenge:
-        return False  # Token not found
-
-    if challenge.used:
-        return False  # Already used (replay attack)
-
-    if datetime.utcnow() > challenge.expires_at:
-        return False  # Expired
-
-    return True
 ```
 
-**EMA Voiceprint Adaptation**:
+**Token Security:**
+- 50^4 = 6,250,000 possible phrase combinations
+- HMAC-SHA256 prevents token forgery
+- 90-second window limits attack time
+- Single-use enforcement prevents replay
+
+**EMA Voiceprint Adaptation:**
 ```python
-def update_voiceprint(old_embedding: list[float],
-                      new_embedding: list[float],
-                      alpha: float = 0.2) -> list[float]:
+def update_voiceprint(
+    old_embedding: list[float],
+    new_embedding: list[float],
+    alpha: float = 0.2
+) -> list[float]:
     """
-    Update voiceprint using Exponential Moving Average.
+    Exponential Moving Average update.
 
-    Args:
-        old_embedding: Current stored voiceprint
-        new_embedding: New embedding from successful auth
-        alpha: Learning rate (0.2 = 20% weight to new sample)
-
-    Returns:
-        Updated embedding (192-dim)
-
-    Formula:
-        voiceprint_new = (1 - α) * voiceprint_old + α * embedding_new
-        voiceprint_new = 0.8 * voiceprint_old + 0.2 * embedding_new
+    Formula: new = (1 - alpha) * old + alpha * current
+           = 0.8 * old + 0.2 * current
 
     Rationale:
-        - α=0.2 balances adaptability and stability
-        - Requires ~10 successful attacks to shift voiceprint 50%
-        - Prevents one-shot poisoning attacks
+    - alpha = 0.2 balances stability with adaptability
+    - Requires ~10 successful authentications to shift 50%
+    - Prevents single-sample poisoning attacks
     """
     return [
         (1.0 - alpha) * old + alpha * new
@@ -489,341 +472,214 @@ def update_voiceprint(old_embedding: list[float],
     ]
 ```
 
-**Security Properties**:
-- **Replay Prevention**: Single-use tokens stored in database
-- **Time Constraint**: 90-second window prevents offline attacks
-- **Phrase Randomness**: 50^4 = 6.25M possible phrases
-- **HMAC Integrity**: SHA-256 prevents token forgery
-
 ---
 
 ## Database Design
 
-### Schema (PostgreSQL)
+### Entity Relationship Diagram
 
-```sql
--- Users table
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Voiceprints table (one per user)
-CREATE TABLE voiceprints (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    embedding FLOAT8[192] NOT NULL,  -- ECAPA-TDNN output
-    sample_count INTEGER DEFAULT 1,
-    updated_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(user_id)  -- One voiceprint per user
-);
-
--- Challenges table (ephemeral, 90s TTL)
-CREATE TABLE challenges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    phrase TEXT NOT NULL,
-    token TEXT UNIQUE NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    used BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Auth logs (audit trail)
-CREATE TABLE auth_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    challenge_id UUID REFERENCES challenges(id) ON DELETE SET NULL,
-    l2_label VARCHAR(20),  -- "bonafide" | "spoof"
-    l2_confidence FLOAT,
-    l1_score FLOAT,
-    result VARCHAR(20),  -- "ACCEPT" | "REJECT"
-    layer_blocked INTEGER,  -- 1, 2, 3, 4, or NULL
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Indexes for performance
-CREATE INDEX idx_voiceprints_user ON voiceprints(user_id);
-CREATE INDEX idx_challenges_token ON challenges(token);
-CREATE INDEX idx_challenges_expires ON challenges(expires_at);
-CREATE INDEX idx_auth_logs_user ON auth_logs(user_id);
-CREATE INDEX idx_auth_logs_created ON auth_logs(created_at DESC);
+```
++-------------+       +---------------+       +--------------+
+|   users     |       |  voiceprints  |       |  challenges  |
++-------------+       +---------------+       +--------------+
+| id (PK)     |<----->| id (PK)       |       | id (PK)      |
+| name        |   1:1 | user_id (FK)  |<------| user_id (FK) |
+| email       |       | embedding[]   |   1:N | phrase       |
+| created_at  |       | sample_count  |       | token        |
++-------------+       | updated_at    |       | expires_at   |
+      ^               +---------------+       | used         |
+      |                                       +--------------+
+      |                                              |
+      |       +---------------+                      |
+      +------>|  auth_logs    |<---------------------+
+          1:N +---------------+
+              | id (PK)       |
+              | user_id (FK)  |
+              | challenge_id  |
+              | l2_label      |
+              | l2_confidence |
+              | l1_score      |
+              | result        |
+              | layer_blocked |
+              | created_at    |
+              +---------------+
 ```
 
-### Data Flow
+### Schema Definition
 
-**Registration**:
-```sql
-INSERT INTO users (name, email) VALUES ('John Doe', 'john@example.com')
-RETURNING id;
-```
+See [docs/DB_SCHEMA.sql](docs/DB_SCHEMA.sql) for complete schema.
 
-**Enrollment** (first sample):
-```sql
-INSERT INTO voiceprints (user_id, embedding, sample_count)
-VALUES ('uuid', [0.1, 0.2, ..., 0.192], 1);
-```
+**Key Design Decisions:**
 
-**Enrollment** (subsequent samples):
-```sql
-UPDATE voiceprints
-SET embedding = [0.08, 0.16, ..., 0.1536],  -- EMA updated
-    sample_count = sample_count + 1,
-    updated_at = NOW()
-WHERE user_id = 'uuid';
-```
-
-**Challenge Generation**:
-```sql
-INSERT INTO challenges (user_id, phrase, token, expires_at)
-VALUES ('uuid', 'blue sky mountain river', 'abc123...', NOW() + INTERVAL '90 seconds');
-```
-
-**Verification Success**:
-```sql
--- Mark token as used
-UPDATE challenges SET used = TRUE WHERE token = 'abc123...';
-
--- Update voiceprint
-UPDATE voiceprints
-SET embedding = [EMA updated],
-    sample_count = sample_count + 1,
-    updated_at = NOW()
-WHERE user_id = 'uuid';
-
--- Log success
-INSERT INTO auth_logs (user_id, challenge_id, l2_label, l2_confidence, l1_score, result)
-VALUES ('uuid', 'challenge-uuid', 'bonafide', 0.94, 0.87, 'ACCEPT');
-```
+1. **UUID Primary Keys:** Prevent enumeration attacks
+2. **One-to-One Voiceprint:** Each user has exactly one voiceprint record
+3. **Embedding Storage:** PostgreSQL FLOAT8[] array (192 elements)
+4. **Audit Trail:** All authentication attempts logged with layer details
 
 ---
 
 ## API Architecture
 
-### Endpoint Documentation
+### Request/Response Flow
 
-**Base URL**: `http://localhost:8000` (dev), `https://your-domain.com` (prod)
-
-**Auto-Generated Docs**: `http://localhost:8000/docs` (Swagger UI)
-
-### 1. POST /auth/register
-
-**Request**:
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com"
-}
+```
+Client Request
+       |
+       v
++------------------+
+| CORS Middleware  |
+| (origin check)   |
++--------+---------+
+         |
+         v
++------------------+
+| FastAPI Router   |
+| (path matching)  |
++--------+---------+
+         |
+         v
++------------------+
+| Pydantic         |
+| Validation       |
++--------+---------+
+         |
+         v
++------------------+
+| Route Handler    |
+| (business logic) |
++--------+---------+
+         |
+         v
++------------------+
+| Database Session |
+| (SQLAlchemy)     |
++--------+---------+
+         |
+         v
+   JSON Response
 ```
 
-**Response** (201 Created):
-```json
-{
-  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
+### Error Handling
 
-**Errors**:
-- 400: Email already registered
-
----
-
-### 2. POST /auth/enroll
-
-**Request** (FormData):
-```
-user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-audio: <binary WAV file>
-```
-
-**Response** (200 OK):
-```json
-{
-  "status": "enrolled",
-  "sample_count": 3
-}
-```
-
-**Errors**:
-- 404: User not found
-- 400: Invalid audio format
-
----
-
-### 3. GET /auth/challenge
-
-**Request**:
-```
-GET /auth/challenge?user_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-**Response** (200 OK):
-```json
-{
-  "phrase": "blue sky mountain river",
-  "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "expires_at": "2026-10-25T14:32:45Z"
-}
-```
-
-**Errors**:
-- 404: User not found
-- 400: No enrolled voiceprint
-
----
-
-### 4. POST /auth/verify
-
-**Request** (FormData):
-```
-user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-token: "eyJ0eXAiOiJKV1QiLCJhbGc..."
-audio: <binary WAV file>
-```
-
-**Response** (200 OK - Success):
-```json
-{
-  "result": "ACCEPT",
-  "confidence": 0.87,
-  "layer_blocked": null,
-  "session_id": "c9d8e7f6-a5b4-3210-9876-543210fedcba",
-  "reason": "Authentication successful",
-  "l2_label": "bonafide",
-  "l2_confidence": 0.94,
-  "l1_score": 0.87,
-  "asr_transcript": "blue sky mountain river",
-  "asr_similarity": 0.98
-}
-```
-
-**Response** (200 OK - Rejection):
-```json
-{
-  "result": "REJECT",
-  "confidence": 0.78,
-  "layer_blocked": 2,
-  "session_id": "b7e1d9f3-...",
-  "reason": "Deepfake/spoof detected",
-  "l2_label": "spoof",
-  "l2_confidence": 0.78,
-  "l1_score": 0.0
-}
-```
-
-**Errors**:
-- 404: User not found
-- 400: No enrolled voiceprint
+| HTTP Code | Meaning | Example |
+|-----------|---------|---------|
+| 200 | Success | Authentication result (ACCEPT or REJECT) |
+| 400 | Bad Request | Email already registered |
+| 404 | Not Found | User not found |
+| 422 | Validation Error | Missing required field |
+| 500 | Server Error | Model loading failure |
 
 ---
 
 ## Security Model
 
-### Threat Mitigation
+### Threat Matrix
 
-| Attack | Mitigation | Layer |
-|--------|-----------|-------|
-| TTS Deepfake | Wav2Vec2 classifier | L2 |
-| Voice Conversion | Wav2Vec2 classifier | L2 |
-| Replay Attack | Single-use HMAC tokens (90s TTL) | L3 |
-| Wrong Phrase | ASR transcription + Levenshtein | ASR |
-| Impersonation | ECAPA speaker embeddings | L1 |
-| Token Forgery | HMAC-SHA256 with secret key | L3 |
-| Voiceprint Poisoning | EMA α=0.2 (requires ~10 attacks) | L3 |
+| Attack Vector | Mitigation | Layer |
+|--------------|------------|-------|
+| AI Voice Cloning | Wav2Vec2 deepfake detector | L2 |
+| Voice Conversion | Wav2Vec2 deepfake detector | L2 |
+| Replay Attack (recording) | Single-use HMAC tokens | L3 |
+| Replay Attack (wrong phrase) | ASR phrase verification | ASR |
+| Impersonation | Speaker embedding comparison | L1 |
+| Token Forgery | HMAC-SHA256 signature | L3 |
+| Brute Force | 90-second token expiration | L3 |
+| Voiceprint Poisoning | EMA with low alpha (0.2) | L3 |
 
-### Cryptographic Security
+### Cryptographic Primitives
 
-**HMAC Token**:
-```python
-# Generation
-secret = os.getenv("L3_HMAC_SECRET")  # 64-char random string
-message = f"{user_id}:{phrase}:{expires_at}"
-token = hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
-
-# Verification
-expected_token = hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
-if not hmac.compare_digest(token, expected_token):
-    raise InvalidTokenError
-```
-
-**Database Encryption**:
-- PostgreSQL TDE (Transparent Data Encryption)
-- SSL/TLS for connections (Supabase default)
-
-**Transport Security**:
-- HTTPS/TLS 1.3 in production
-- CORS restricted to allowed origins
+- **Token Signing:** HMAC-SHA256
+- **Token Format:** Hex-encoded 64-character string
+- **Secret Management:** Environment variables (never committed)
 
 ---
 
-## Performance Optimization
+## Performance Considerations
 
-### Model Caching
-
-**Problem**: First request loads models from disk (8-12s cold start)
-
-**Solution**: In-memory caching after first load
+### Model Loading
 
 ```python
-# Lazy loading pattern
+# Lazy loading pattern to avoid startup delay
 _DEEPFAKE_MODEL = None
-_SPEAKER_MODEL = None
-_WHISPER_MODEL = None
 
 def get_deepfake_model():
     global _DEEPFAKE_MODEL
     if _DEEPFAKE_MODEL is None:
-        _DEEPFAKE_MODEL = AutoModelForAudioClassification.from_pretrained(...)
+        _DEEPFAKE_MODEL = load_model()
     return _DEEPFAKE_MODEL
 ```
 
 ### Database Connection Pooling
 
 ```python
-# backend/app/db.py
 engine = create_engine(
     DATABASE_URL,
-    pool_size=5,        # Maintain 5 connections
-    max_overflow=10,    # Allow 10 additional connections under load
-    pool_pre_ping=True  # Check connection health before use
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True
 )
 ```
 
-### Audio Processing
+### Audio Processing Optimization
 
-**Optimization**: Auto-resample to 16kHz once, reuse for all layers
+- Resample to 16kHz once at entry point
+- Reuse normalized audio across all layers
+- Process in memory (no temp files for main path)
 
-```python
-# Resample once at entry point
-audio, sr = sf.read(io.BytesIO(audio_bytes))
-if sr != 16000:
-    audio = librosa.resample(audio, orig_sr=sr, target_sr=16000)
+---
 
-# Reuse for L2, ASR, L1
-l2_result = detect_spoof(audio)  # Uses 16kHz audio
-l1_result = verify_speaker(audio)  # Reuses same audio
+## Scalability
+
+### Current Capacity
+
+- Single server: ~100 concurrent users
+- Database: PostgreSQL handles thousands of RPS
+- Bottleneck: Model inference (CPU-bound)
+
+### Scaling Strategies
+
+1. **Vertical:** GPU acceleration for model inference (5-10x speedup)
+2. **Horizontal:** Load balancer with multiple backend instances
+3. **Caching:** Redis for challenge tokens (faster than PostgreSQL)
+4. **Model Optimization:** INT8 quantization (4x memory reduction)
+
+### Future Architecture
+
+```
+                    +------------------+
+                    | Load Balancer    |
+                    | (nginx/HAProxy)  |
+                    +--------+---------+
+                             |
+         +-------------------+-------------------+
+         |                   |                   |
+         v                   v                   v
++----------------+  +----------------+  +----------------+
+| Backend Pod 1  |  | Backend Pod 2  |  | Backend Pod N  |
+| (Gunicorn)     |  | (Gunicorn)     |  | (Gunicorn)     |
++-------+--------+  +-------+--------+  +-------+--------+
+        |                   |                   |
+        +-------------------+-------------------+
+                            |
+                 +----------+-----------+
+                 |                      |
+                 v                      v
+        +----------------+     +----------------+
+        | PostgreSQL     |     | Redis          |
+        | (Primary)      |     | (Cache)        |
+        +----------------+     +----------------+
 ```
 
 ---
 
-## Scalability Considerations
+## References
 
-### Current Limits
-- **Single Server**: 100 concurrent users (tested)
-- **Database**: PostgreSQL handles 1000s RPS
-- **Bottleneck**: Model inference (GPU would help)
-
-### Future Improvements
-- **GPU Inference**: 5-10x speedup for Wav2Vec2, ECAPA
-- **Model Quantization**: INT8 reduces memory 4x
-- **Load Balancer**: Horizontal scaling with multiple backend instances
-- **Redis Cache**: Store challenge tokens in-memory (faster than PostgreSQL)
-- **CDN**: Serve frontend from edge (Cloudflare, Fastly)
+- [ECAPA-TDNN Paper](https://arxiv.org/abs/2005.07143)
+- [Wav2Vec 2.0 Paper](https://arxiv.org/abs/2006.11477)
+- [Whisper Paper](https://arxiv.org/abs/2212.04356)
+- [ASVspoof Challenge](https://www.asvspoof.org/)
 
 ---
 
-**Architecture Version**: 1.0.0
-**Last Updated**: October 2026
-**Maintainers**: See [README.md](README.md#team)
+**Document Version:** 1.0
+**Last Updated:** October 2024

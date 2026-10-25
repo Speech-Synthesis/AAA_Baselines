@@ -1,175 +1,328 @@
-# AAA Engine — Shared Contract (Phase 0 Checkpoint)
+# Team Development Contract
 
-Read by all 4 people before writing any code. Nobody starts their module until this file is merged to `main`. Any change to this file after Phase 0 requires all 4 people to agree — it's the single source of truth everyone's code is built against.
-
----
-
-## 1. Team / Track / Tool Map
-
-| Person | Track | AI Tool | Branch |
-|---|---|---|---|
-| Navadeep | Infra + Backend orchestration | Claude Pro | `infra-backend` |
-| Surya | Layer 1 — Speaker Verification | Claude Pro | `layer1-speaker` |
-| Nandan | Layer 2 — Deepfake Detection | Antigravity | `layer2-deepfake` |
-| Aditya | Layer 3 (Challenge-Response + EMA) + Frontend | Antigravity | `layer3-frontend` |
-
-Repo: one shared GitHub repo, `main` protected, each person works only on their own branch and only touches their own files (see Repo Structure below) to avoid merge conflicts. PRs open at each checkpoint.
+Internal documentation defining module ownership, interface contracts, and development workflow.
 
 ---
 
-## 2. Repo Structure (each person owns their own files only)
+## Table of Contents
 
+- [Team Structure](#team-structure)
+- [Module Ownership](#module-ownership)
+- [Interface Contracts](#interface-contracts)
+- [Audio Specification](#audio-specification)
+- [Database Schema](#database-schema)
+- [API Contract](#api-contract)
+- [ML Models](#ml-models)
+- [Development Phases](#development-phases)
+
+---
+
+## Team Structure
+
+| Member | Role | Responsibility |
+|--------|------|----------------|
+| Navadeep | Lead Developer | Infrastructure, Backend orchestration, API routing |
+| Surya | ML Engineer | Layer 1 - Speaker Verification (ECAPA-TDNN) |
+| Nandan | ML Engineer | Layer 2 - Deepfake Detection (Wav2Vec2) |
+| Aditya | Full Stack | Layer 3 - Challenge-Response, EMA, Frontend |
+
+---
+
+## Module Ownership
+
+### Backend Files
+
+| File | Owner | Purpose |
+|------|-------|---------|
+| `main.py` | Navadeep | API routes, pipeline orchestration |
+| `db.py` | Navadeep | Database engine configuration |
+| `models.py` | Navadeep | SQLAlchemy ORM models |
+| `layer1_speaker.py` | Surya | Speaker embedding extraction and verification |
+| `layer2_deepfake.py` | Nandan | Deepfake/spoof detection |
+| `layer3_adaptive.py` | Aditya | Challenge generation, token validation, EMA |
+| `layer3_asr.py` | Aditya | ASR phrase verification |
+
+### Frontend Files
+
+| Directory | Owner | Purpose |
+|-----------|-------|---------|
+| `frontend/src/components/` | Aditya | React page components |
+| `frontend/src/api.js` | Aditya | Backend API client |
+
+### Integration Rule
+
+Only `main.py` imports from the layer modules. Direct cross-module imports are prohibited to prevent merge conflicts and maintain clear interfaces.
+
+---
+
+## Interface Contracts
+
+### Layer 1: Speaker Verification
+
+**File:** `backend/app/layer1_speaker.py`
+**Owner:** Surya
+
+```python
+def enroll_speaker(audio_bytes: bytes) -> dict:
+    """
+    Extract speaker embedding from audio.
+
+    Args:
+        audio_bytes: Raw WAV audio data (16kHz mono)
+
+    Returns:
+        {"embedding": list[float]}  # 192-dimensional vector
+    """
+
+def verify_speaker(audio_bytes: bytes, stored_embedding: list[float]) -> dict:
+    """
+    Compare audio against stored voiceprint.
+
+    Args:
+        audio_bytes: Raw WAV audio data
+        stored_embedding: 192-dim embedding from enrollment
+
+    Returns:
+        {
+            "score": float,      # Cosine similarity [0, 1]
+            "embedding": list    # Current embedding for EMA update
+        }
+    """
 ```
-/backend
-  /app
-    main.py              # Navadeep — orchestrates L2 → L1 → L3, wires everything
-    db.py                # Navadeep — SQLAlchemy engine, session
-    models.py             # Navadeep — ORM models (matches schema below)
-    layer1_speaker.py     # Surya — implements verify_speaker() / enroll_speaker()
-    layer2_deepfake.py    # Nandan — implements detect_spoof()
-    layer3_adaptive.py    # Aditya — implements generate_challenge(), verify_token(), update_voiceprint()
-  requirements.txt
-/frontend                 # Aditya — React (Vite)
-/docs
-  00_SHARED_CONTRACT.md   # this file
-  DB_SCHEMA.sql
-docker-compose.yml         # Navadeep
-.env.example               # Navadeep
+
+### Layer 2: Deepfake Detection
+
+**File:** `backend/app/layer2_deepfake.py`
+**Owner:** Nandan
+
+```python
+def detect_spoof(audio_bytes: bytes) -> dict:
+    """
+    Classify audio as genuine or synthetic.
+
+    Args:
+        audio_bytes: Raw WAV audio data
+
+    Returns:
+        {
+            "label": "bonafide" | "spoof",
+            "confidence": float  # 0.0 to 1.0
+        }
+    """
 ```
 
-Rule: only `main.py` imports from the other three `layerX_*.py` files. Nobody edits someone else's `layerX_*.py`. This is what keeps merge conflicts near-zero.
+### Layer 3: Challenge-Response
+
+**File:** `backend/app/layer3_adaptive.py`
+**Owner:** Aditya
+
+```python
+def generate_challenge(user_id: str) -> dict:
+    """
+    Generate random challenge phrase with signed token.
+
+    Args:
+        user_id: UUID of the user
+
+    Returns:
+        {
+            "phrase": str,       # Random 4-word phrase
+            "token": str,        # HMAC-SHA256 signed token
+            "expires_at": datetime  # 90 seconds from now
+        }
+    """
+
+def verify_token(token: str) -> bool:
+    """
+    Validate challenge token.
+
+    Checks:
+        - Token exists in database
+        - Token not expired (90s TTL)
+        - Token not already used
+
+    Returns:
+        True if valid, False otherwise
+    """
+
+def update_voiceprint(
+    old_embedding: list[float],
+    new_embedding: list[float],
+    alpha: float = 0.2
+) -> list[float]:
+    """
+    Update voiceprint using Exponential Moving Average.
+
+    Formula: new = (1-alpha) * old + alpha * current
+           = 0.8 * old + 0.2 * current
+
+    Returns:
+        Updated 192-dimensional embedding
+    """
+```
 
 ---
 
-## 3. Audio Spec (fixed for everyone)
+## Audio Specification
 
-- Format: WAV, 16kHz, mono
-- Enrollment clip: min 3s (Phase 1) → 10s (Phase 2, per FR1)
-- Challenge/verify clip: min 2–3s
-- All audio hits the API as multipart file upload
+| Property | Requirement |
+|----------|-------------|
+| Format | WAV |
+| Sample Rate | 16kHz |
+| Channels | Mono |
+| Bit Depth | 16-bit PCM |
+| Enrollment Duration | Minimum 3 seconds |
+| Verification Duration | Minimum 2 seconds |
+| Upload Method | multipart/form-data |
+
+Audio is automatically resampled and converted to mono if necessary.
 
 ---
 
-## 4. Database — Postgres (hosted, shared)
+## Database Schema
 
-Navadeep provisions a free-tier hosted Postgres (Neon or Supabase) in Phase 0 and shares the connection string via `.env` (never committed — `.env.example` only, real `.env` shared over Slack/WhatsApp).
+Reference: [DB_SCHEMA.sql](DB_SCHEMA.sql)
 
+### Tables
+
+**users**
 ```sql
--- DB_SCHEMA.sql
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT,
-  email TEXT UNIQUE,
-  created_at TIMESTAMP DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
 );
+```
 
+**voiceprints**
+```sql
 CREATE TABLE voiceprints (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  embedding FLOAT8[192],
-  sample_count INT DEFAULT 1,
-  updated_at TIMESTAMP DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    embedding FLOAT8[192] NOT NULL,
+    sample_count INT DEFAULT 1,
+    updated_at TIMESTAMP DEFAULT now(),
+    UNIQUE(user_id)
 );
+```
 
+**challenges**
+```sql
 CREATE TABLE challenges (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  phrase TEXT,
-  token TEXT,
-  expires_at TIMESTAMP,
-  used BOOLEAN DEFAULT FALSE
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    phrase TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT now()
 );
+```
 
+**auth_logs**
+```sql
 CREATE TABLE auth_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id),
-  challenge_id UUID REFERENCES challenges(id),
-  l2_label TEXT,
-  l2_confidence FLOAT,
-  l1_score FLOAT,
-  result TEXT,
-  layer_blocked INT,
-  created_at TIMESTAMP DEFAULT now()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    challenge_id UUID REFERENCES challenges(id) ON DELETE SET NULL,
+    l2_label TEXT,
+    l2_confidence FLOAT,
+    l1_score FLOAT,
+    result TEXT NOT NULL,
+    layer_blocked INT,
+    created_at TIMESTAMP DEFAULT now()
 );
 ```
 
 ---
 
-## 5. API Contract (frozen — Navadeep implements the routes, calls into the other 3 modules)
+## API Contract
 
-| Endpoint | Method | Body / Query | Response |
-|---|---|---|---|
+| Endpoint | Method | Input | Output |
+|----------|--------|-------|--------|
 | `/auth/register` | POST | `{name, email}` | `{user_id}` |
-| `/auth/enroll` | POST | `user_id` + audio file | `{status, sample_count}` |
-| `/auth/challenge` | GET | `?user_id=` | `{phrase, token, expires_at}` |
-| `/auth/verify` | POST | `user_id, token` + audio file | see below |
-| `/users/{id}/voiceprint-history` | GET | — | `[{updated_at, sample_count}, ...]` |
+| `/auth/enroll` | POST | `user_id` + audio | `{status, sample_count}` |
+| `/auth/challenge` | GET | `?user_id=<uuid>` | `{phrase, token, expires_at}` |
+| `/auth/verify` | POST | `user_id, token` + audio | See below |
+| `/users/{id}/voiceprint-history` | GET | - | `[{updated_at, sample_count}]` |
+| `/users/{id}/auth-logs` | GET | - | `[{id, result, ...}]` |
 
-`/auth/verify` response shape (matches PPT demo JSON exactly):
+### Verify Response Schema
+
 ```json
 {
-  "result": "ACCEPT" | "REJECT",
-  "confidence": 0.0,
-  "layer_blocked": null | 1 | 2,
-  "session_id": "uuid",
-  "reason": "string",
-  "l2_label": "bonafide" | "spoof",
-  "l2_confidence": 0.0,
-  "l1_score": 0.0
+    "result": "ACCEPT | REJECT",
+    "confidence": 0.0,
+    "layer_blocked": null | 1 | 2 | 3 | 4,
+    "session_id": "uuid",
+    "reason": "string",
+    "l2_label": "bonafide | spoof",
+    "l2_confidence": 0.0,
+    "l1_score": 0.0,
+    "asr_transcript": "string",
+    "asr_similarity": 0.0
 }
 ```
 
 ---
 
-## 6. Module Interfaces (function signatures each person's file must expose — this is what makes independent work possible)
+## ML Models
 
-**`layer1_speaker.py` (Surya):**
-```python
-def enroll_speaker(audio_bytes: bytes) -> dict:
-    # returns {"embedding": list[float]}  # 192-dim
+### Layer 1: Speaker Verification
 
-def verify_speaker(audio_bytes: bytes, stored_embedding: list[float]) -> dict:
-    # returns {"score": float, "embedding": list[float]}  # cosine similarity 0-1
-```
+| Property | Value |
+|----------|-------|
+| Model | `speechbrain/spkrec-ecapa-voxceleb` |
+| Architecture | ECAPA-TDNN |
+| Embedding Dimension | 192 |
+| Training Data | VoxCeleb |
 
-**`layer2_deepfake.py` (Nandan):**
-```python
-def detect_spoof(audio_bytes: bytes) -> dict:
-    # returns {"label": "bonafide" | "spoof", "confidence": float}
-```
+### Layer 2: Deepfake Detection
 
-**`layer3_adaptive.py` (Aditya):**
-```python
-def generate_challenge(user_id: str) -> dict:
-    # returns {"phrase": str, "token": str, "expires_at": datetime}
+| Property | Value |
+|----------|-------|
+| Model | `garystafford/wav2vec2-deepfake-voice-detector` |
+| Architecture | Wav2Vec2 + Classification Head |
+| Training Data | ASVspoof 2019 LA |
+| Output Classes | bonafide, spoof |
 
-def verify_token(token: str) -> bool:
-    # single-use + TTL check
+### ASR: Phrase Verification
 
-def update_voiceprint(old_embedding: list[float], new_embedding: list[float], alpha: float = 0.2) -> list[float]:
-    # returns 0.8*old + 0.2*current, elementwise
-```
-
-Everyone stubs/mocks the others' functions with fake return values during Phase 1 so nobody blocks on anybody else. Real wiring happens at the Phase 2 integration checkpoint.
+| Property | Value |
+|----------|-------|
+| Model | OpenAI Whisper (base) |
+| Parameters | 74M |
+| Languages | English (primary) |
 
 ---
 
-## 7. Models (Phase 1 — pretrained, zero training)
+## Development Phases
 
-- **Layer 1**: `speechbrain/spkrec-ecapa-voxceleb` (HF/SpeechBrain) — pretrained ECAPA-TDNN, 192-dim embedding, CPU-fine for demo.
-- **Layer 2**: `HyperMoon/wav2vec2-base-960h-finetuned-deepfake` (trained on ASVspoof2019). Fallback: `abhishtagatya/wav2vec2-base-960h-asv19-deepfake`.
+### Phase 0: Setup
+- Contract agreement
+- Repository structure
+- Database provisioning
+- Environment configuration
 
-Phase 2 (later, on Amrita HPC): fine-tune Wav2Vec2BERT on ASVspoof2019 LA / eval on 2021 DF; benchmark ECAPA-TDNN threshold on VoxCeleb1.
+### Phase 1: Independent Development
+- Build modules against mocked interfaces
+- Unit testing with synthetic data
+- No cross-team dependencies
+
+### Phase 2: Integration
+- Merge all modules
+- Wire real function calls
+- End-to-end testing
+- Bug resolution
+
+### Phase 3: Enhancement
+- Performance optimization
+- Threshold tuning
+- Documentation
+- Production deployment
 
 ---
 
-## 8. Phase Timeline (all 4 people)
-
-| Phase | What | Exit criteria |
-|---|---|---|
-| **0 — Sync** | This doc agreed + merged, hosted DB live, repo/branches created | Everyone can reach the DB, `main` has this file + schema |
-| **1 — Independent build** | Each person builds their module against mocked interfaces | Each branch's module passes its own local test with mocked I/O |
-| **2 — Integration** | Merge all 4 branches, Navadeep wires real calls in `main.py`, run enroll→challenge→verify end-to-end (1 ACCEPT + 1 REJECT) | Live demo works against the shared DB |
-| **3 — Phase 2 upgrades** | Fine-tune Wav2Vec2BERT on HPC, benchmark ECAPA-TDNN on VoxCeleb1, EMA α tuning, security hardening, load test | Matches "Plans for Upcoming Semesters" slide targets |
-
-No one starts Phase 1 code before Phase 0's exit criteria are met.
+**Contract Version:** 1.0
+**Effective Date:** October 2024
