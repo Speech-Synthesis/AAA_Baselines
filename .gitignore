@@ -45,3 +45,6 @@ test_audio/
 
 # Unwanted files
 nul
+
+# Internal docs (not for repo)
+ISSUES_TODO.md
