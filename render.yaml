@@ -3,7 +3,6 @@ services:
   - type: web
     name: aaa-backend
     runtime: python
-    plan: free
     region: oregon
     buildCommand: "cd backend && pip install -r requirements.txt"
     startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
@@ -20,11 +19,10 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.0"
 
-  # Frontend Static Site
+  # Frontend Static Site (Free tier still available)
   - type: web
     name: aaa-frontend
     runtime: static
-    plan: free
     buildCommand: "cd frontend && npm install && npm run build"
     staticPublishPath: ./frontend/dist
     routes:
