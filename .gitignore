@@ -39,3 +39,9 @@ test_audio/
 
 # Build
 *.whl
+
+# Claude CLI
+.claude/
+
+# Unwanted files
+nul

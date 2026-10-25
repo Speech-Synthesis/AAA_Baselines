@@ -16,7 +16,9 @@ function App() {
 
   // Load users from database on startup
   const loadUsers = async () => {
+    console.log('Loading users...');
     const users = await getAllUsers();
+    console.log('Loaded users:', users);
     setRegisteredUsers(users);
     if (users.length > 0 && !activeUser) {
       setActiveUser(users[0]);
