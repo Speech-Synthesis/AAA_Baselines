@@ -3,12 +3,16 @@ AAA Engine API - Navadeep
 Orchestrates L2 → L1 → L3 pipeline
 """
 
+import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -36,12 +40,18 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:3000",
         "https://aaa-frontend.onrender.com",
-        "https://*.onrender.com"
+        "https://*.onrender.com",
+        "https://*.hf.space"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve static frontend files (for production deployment)
+STATIC_DIR = Path(__file__).parent.parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
 # Thresholds (tune in Phase 2)
 L2_SPOOF_THRESHOLD = 0.5  # Reject if spoof confidence > this
@@ -461,3 +471,19 @@ async def get_auth_logs(user_id: str, db: Session = Depends(get_db)):
         )
         for log in logs
     ]
+
+
+# Serve frontend for all non-API routes (must be at the end)
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve React frontend for client-side routing."""
+    if STATIC_DIR.exists():
+        # Try to serve the exact file first
+        file_path = STATIC_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        # Fall back to index.html for client-side routing
+        index_path = STATIC_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+    return {"message": "AAA Engine API", "status": "running"}

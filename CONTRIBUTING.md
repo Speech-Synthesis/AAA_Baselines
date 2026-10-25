@@ -381,8 +381,8 @@ AAA_Baselines/
 │   │   └── App.jsx              # Router
 │   └── package.json
 └── docs/
-    ├── 00_SHARED_CONTRACT.md    # Team contract
-    └── ARCHITECTURE.md          # Technical docs
+    ├── TEAM_CONTRACT.md         # Team contract
+    └── DB_SCHEMA.sql            # Database schema
 ```
 
 ### Where to Make Changes

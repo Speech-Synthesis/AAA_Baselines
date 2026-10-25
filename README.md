@@ -1,4 +1,14 @@
-# 🔐 AAA Engine — Adaptive Audio Authentication
+---
+title: AAA Engine
+emoji: 🔐
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+license: mit
+---
+
+# AAA Engine — Adaptive Audio Authentication
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -11,7 +21,7 @@ A four-layer voice authentication system combining deepfake detection, phrase ve
 
 ---
 
-## 🎯 Overview
+## Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -27,18 +37,18 @@ A four-layer voice authentication system combining deepfake detection, phrase ve
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 🚀 Key Features
+### Key Features
 
-- ✅ **99.2% Genuine Acceptance** - Low false rejection rate (L1 threshold: 0.50)
-- ✅ **95.8% Deepfake Rejection** - Wav2Vec2-based spoof detection
-- ✅ **98.1% Phrase Accuracy** - ASR-based challenge verification
-- ✅ **Zero Replay Attacks** - HMAC-SHA256 single-use tokens (90s TTL)
-- ✅ **Adaptive Voiceprints** - EMA evolution: `0.8 × old + 0.2 × new`
-- ✅ **Production-Ready** - Full-stack deployment with PostgreSQL persistence
+- **99.2% Genuine Acceptance** — Low false rejection rate (L1 threshold: 0.50)
+- **95.8% Deepfake Rejection** — Wav2Vec2-based spoof detection
+- **98.1% Phrase Accuracy** — ASR-based challenge verification
+- **Zero Replay Attacks** — HMAC-SHA256 single-use tokens (90s TTL)
+- **Adaptive Voiceprints** — EMA evolution: `0.8 × old + 0.2 × new`
+- **Production-Ready** — Full-stack deployment with PostgreSQL persistence
 
 ---
 
-## 🛡️ Security Layers
+## Security Layers
 
 ### Layer 2: Deepfake Detection (First Line of Defense)
 - **Model**: `garystafford/wav2vec2-deepfake-voice-detector`
@@ -94,12 +104,13 @@ AAA_Baselines/
 │   │   └── App.jsx              # Router
 │   └── package.json
 └── docs/
-    └── 00_SHARED_CONTRACT.md    # Team contract + API specs
+    ├── TEAM_CONTRACT.md         # Team contract + API specs
+    └── DB_SCHEMA.sql            # Database schema
 ```
 
 ---
 
-## 📊 Performance Metrics
+## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
@@ -112,7 +123,7 @@ AAA_Baselines/
 | **False Acceptance Rate (FAR)** | **0.6%** |
 | **Equal Error Rate (EER)** | **0.7%** |
 
-### ⚡ Latency Breakdown
+### Latency Breakdown
 
 | Layer | Operation | Latency |
 |-------|-----------|---------|
@@ -126,7 +137,7 @@ AAA_Baselines/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone & Setup Environment
 
@@ -274,7 +285,7 @@ auth_logs (id, user_id, challenge_id, l2_label, l2_confidence, l1_score, result,
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -287,7 +298,7 @@ auth_logs (id, user_id, challenge_id, l2_label, l2_confidence, l1_score, result,
 
 ---
 
-## 🎥 Demo
+## Demo
 
 ### Live Demo (if deployed)
 **URL**: [https://aaa-engine-demo.fly.dev](https://aaa-engine-demo.fly.dev) *(replace with actual URL)*
@@ -302,7 +313,7 @@ See [DEMO.md](DEMO.md) for complete demonstration guide with sample outputs.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
@@ -317,7 +328,7 @@ See [DEMO.md](DEMO.md) for complete demonstration guide with sample outputs.
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -348,7 +359,7 @@ ASR_PHRASE_THRESHOLD = 0.6  # Phrase similarity
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -376,7 +387,7 @@ npm run dev
 
 ---
 
-## 👥 Team
+## Team
 
 | Name | Role | Branch (Historical) |
 |------|------|---------------------|
@@ -387,7 +398,7 @@ npm run dev
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
@@ -395,7 +406,7 @@ Copyright (c) 2026 AAA Engine Team
 
 ---
 
-## 🌟 Acknowledgments
+## Acknowledgments
 
 - **SpeechBrain** for ECAPA-TDNN speaker verification model
 - **Hugging Face** for Wav2Vec2 deepfake detection model
@@ -404,7 +415,7 @@ Copyright (c) 2026 AAA Engine Team
 
 ---
 
-## 📞 Contact & Support
+## Contact & Support
 
 - **Issues**: [GitHub Issues](https://github.com/Speech-Synthesis/AAA_Baselines/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Speech-Synthesis/AAA_Baselines/discussions)
@@ -412,7 +423,7 @@ Copyright (c) 2026 AAA Engine Team
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] GPU acceleration for model inference
 - [ ] Multilingual support (99 languages via Whisper)
@@ -424,4 +435,4 @@ Copyright (c) 2026 AAA Engine Team
 
 ---
 
-**⭐ Star this repo if you find it useful!**
+**Star this repo if you find it useful!**
