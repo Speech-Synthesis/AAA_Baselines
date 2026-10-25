@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 // API base URL (Backend FastAPI server)
-const API_BASE = 'http://localhost:8000';
+// Auto-detect: use localhost in dev, Render backend in production
+const API_BASE = window.location.hostname === 'localhost'
+  ? 'http://localhost:8000'
+  : 'https://aaa-backend.onrender.com';
 
 // Configure Axios client with timeout (60s for model loading on first request)
 const client = axios.create({
@@ -22,10 +25,12 @@ export const checkServerHealth = async () => {
 // Get all registered users
 export const getAllUsers = async () => {
   try {
+    console.log('Fetching users from:', API_BASE + '/users');
     const res = await client.get('/users');
+    console.log('Users fetched:', res.data);
     return res.data;
   } catch (err) {
-    console.error('Get users error:', err);
+    console.error('Get users error:', err.message, err.response?.status);
     return [];
   }
 };

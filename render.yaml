@@ -1,0 +1,38 @@
+services:
+  # Backend API
+  - type: web
+    name: aaa-backend
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: L3_HMAC_SECRET
+        generateValue: true
+        sync: false
+      - key: DEBUG
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+
+  # Frontend Static Site
+  - type: web
+    name: aaa-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "20.10.0"
