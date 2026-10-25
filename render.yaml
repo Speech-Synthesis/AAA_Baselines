@@ -15,7 +15,6 @@ services:
         sync: false
       - key: L3_HMAC_SECRET
         generateValue: true
-        sync: false
       - key: DEBUG
         value: "false"
       - key: PYTHON_VERSION
@@ -26,7 +25,6 @@ services:
     name: aaa-frontend
     runtime: static
     plan: free
-    region: oregon
     buildCommand: "cd frontend && npm install && npm run build"
     staticPublishPath: ./frontend/dist
     routes:
