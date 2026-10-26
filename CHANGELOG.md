@@ -8,6 +8,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- Docker full-stack deployment with multi-stage builds
+- Database-agnostic ORM models (SQLite and PostgreSQL support)
+
+### Changed
+- Refactored models.py to use custom GUID and JSONEncodedList types for cross-database compatibility
+- Improved static file serving for combined frontend/backend deployment
+
 ### Planned
 - GPU acceleration for model inference
 - Multilingual phrase support via Whisper

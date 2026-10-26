@@ -1,5 +1,11 @@
 # AAA Engine
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com)
+[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org)
+[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://docker.com)
+
 **Adaptive Audio Authentication with Deepfake Detection**
 
 A production-ready voice authentication system that combines four security layers: deepfake detection, phrase verification, speaker recognition, and adaptive voiceprint evolution.
@@ -471,6 +477,7 @@ For detailed deployment instructions, see [INSTALLATION.md](INSTALLATION.md).
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design and technical details |
 | [INSTALLATION.md](INSTALLATION.md) | Setup and deployment guide |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [SECURITY.md](SECURITY.md) | Security policy and vulnerability reporting |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [DEMO.md](DEMO.md) | Demo walkthrough with examples |
 | [docs/DB_SCHEMA.sql](docs/DB_SCHEMA.sql) | Database schema |
