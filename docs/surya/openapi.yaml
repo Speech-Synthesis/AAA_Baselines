@@ -1,0 +1,532 @@
+openapi: 3.1.0
+info:
+  title: AAA Engine API
+  description: |
+    Adaptive Audio Authentication Engine - Voice authentication with deepfake detection.
+
+    ## Authentication
+    All protected endpoints require Bearer token authentication.
+
+    ## Decision Values
+    - `APPROVE` - Authentication successful
+    - `DENY` - Authentication failed
+    - `STEP_UP` - Additional verification required
+    - `REVIEW` - Manual review required
+    - `UNAVAILABLE` - Service temporarily unavailable
+  version: 1.0.0
+  contact:
+    name: AAA Engine Team
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://aaa-backend.onrender.com
+    description: Production
+
+tags:
+  - name: authentication
+    description: Voice authentication operations
+  - name: enrollment
+    description: Voice enrollment operations
+  - name: risk
+    description: Transcript risk analysis
+  - name: health
+    description: Health and readiness checks
+
+paths:
+  /v1/health:
+    get:
+      tags: [health]
+      summary: Liveness check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /v1/ready:
+    get:
+      tags: [health]
+      summary: Readiness check
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /v1/enroll:
+    post:
+      tags: [enrollment]
+      summary: Enroll voice sample
+      operationId: enrollVoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [user_id, audio, consent_token]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: User identifier
+                audio:
+                  type: string
+                  format: binary
+                  description: WAV audio file (16kHz, mono, 3-10s)
+                consent_token:
+                  type: string
+                  description: User consent verification token
+      responses:
+        '201':
+          description: Voice enrolled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: User already enrolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/challenges:
+    post:
+      tags: [authentication]
+      summary: Generate authentication challenge
+      operationId: createChallenge
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChallengeRequest'
+      responses:
+        '201':
+          description: Challenge created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeResponse'
+        '404':
+          description: User not found or no voiceprint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/verify:
+    post:
+      tags: [authentication]
+      summary: Verify voice authentication
+      operationId: verifyVoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: X-Capture-Grant
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Capture authorization token
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [challenge_id, audio]
+              properties:
+                challenge_id:
+                  type: string
+                  format: uuid
+                  description: Challenge identifier
+                audio:
+                  type: string
+                  format: binary
+                  description: WAV audio file (16kHz, mono)
+      responses:
+        '200':
+          description: Verification completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '422':
+          description: Verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+
+  /v1/verification-requests/{request_id}:
+    get:
+      tags: [authentication]
+      summary: Get verification request status
+      operationId: getVerificationRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Verification request details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationRequestResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/risk/transcript:
+    post:
+      tags: [risk]
+      summary: Analyze transcript for risk
+      operationId: analyzeTranscript
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscriptRiskRequest'
+      responses:
+        '200':
+          description: Risk analysis completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptRiskResponse'
+
+  /v1/voiceprints/{voiceprint_id}/revoke:
+    post:
+      tags: [enrollment]
+      summary: Revoke voiceprint
+      operationId: revokeVoiceprint
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: voiceprint_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeRequest'
+      responses:
+        '200':
+          description: Voiceprint revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Host application JWT token
+
+  parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Client-generated request ID for tracing
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    Decision:
+      type: string
+      enum: [APPROVE, DENY, STEP_UP, REVIEW, UNAVAILABLE]
+      description: Authentication decision
+
+    RiskLevel:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+      description: Risk assessment level
+
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy]
+        timestamp:
+          type: string
+          format: date-time
+
+    ReadinessResponse:
+      type: object
+      required: [status, timestamp, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [ok, error]
+            models:
+              type: object
+              properties:
+                speaker_verification:
+                  type: string
+                  enum: [ok, loading, error]
+                deepfake_detection:
+                  type: string
+                  enum: [ok, loading, error]
+                asr:
+                  type: string
+                  enum: [ok, loading, error]
+            configuration:
+              type: string
+              enum: [ok, error]
+
+    EnrollResponse:
+      type: object
+      required: [request_id, user_id, status, sample_count, enrolled_at]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [enrolled, updated]
+        sample_count:
+          type: integer
+          minimum: 1
+        enrolled_at:
+          type: string
+          format: date-time
+
+    ChallengeRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          description: Optional session identifier
+
+    ChallengeResponse:
+      type: object
+      required: [challenge_id, phrase, capture_grant, expires_at, ttl_seconds]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        phrase:
+          type: string
+          description: Challenge phrase to speak
+          example: "Say: seven crimson falcon four"
+        capture_grant:
+          type: string
+          description: Token for audio upload authorization
+        expires_at:
+          type: string
+          format: date-time
+        ttl_seconds:
+          type: integer
+          default: 90
+
+    VerifyResponse:
+      type: object
+      required: [request_id, verification_id, decision, reason, completed_at]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        verification_id:
+          type: string
+          format: uuid
+        decision:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+          description: Human-readable decision reason
+        completed_at:
+          type: string
+          format: date-time
+
+    VerificationRequestResponse:
+      type: object
+      required: [request_id, user_id, status, created_at]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, completed, failed]
+        decision:
+          $ref: '#/components/schemas/Decision'
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    TranscriptRiskRequest:
+      type: object
+      required: [session_id, transcript]
+      properties:
+        session_id:
+          type: string
+        transcript:
+          type: string
+          description: Call transcript text
+        context:
+          type: object
+          properties:
+            call_type:
+              type: string
+              enum: [inbound, outbound]
+            claimed_identity:
+              type: string
+
+    TranscriptRiskResponse:
+      type: object
+      required: [request_id, risk_level, risk_indicators, recommended_action, analyzed_at]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        risk_indicators:
+          type: array
+          items:
+            type: string
+        recommended_action:
+          $ref: '#/components/schemas/Decision'
+        analyzed_at:
+          type: string
+          format: date-time
+
+    RevokeRequest:
+      type: object
+      required: [reason, confirmation_token]
+      properties:
+        reason:
+          type: string
+          enum: [user_requested, security_concern, account_closure]
+        confirmation_token:
+          type: string
+
+    RevokeResponse:
+      type: object
+      required: [voiceprint_id, status, revoked_at]
+      properties:
+        voiceprint_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [revoked]
+        revoked_at:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: invalid_request
+        message:
+          type: string
+          description: Human-readable error message
+        request_id:
+          type: string
+          format: uuid
+        details:
+          type: object
+          additionalProperties: true
