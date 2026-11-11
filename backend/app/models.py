@@ -79,9 +79,12 @@ class Challenge(Base):
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     user_id = Column(GUID(), ForeignKey("users.id"))
     phrase = Column(Text)
-    token = Column(Text)
-    expires_at = Column(DateTime)
-    used = Column(Boolean, default=False)
+    token = Column(Text, unique=True, index=True)  # Indexed for fast lookup
+    signature = Column(Text)  # HMAC signature for verification
+    payload = Column(Text)  # Raw signed payload
+    expires_at = Column(DateTime, index=True)  # Indexed for cleanup queries
+    used = Column(Boolean, default=False, index=True)  # Indexed for filtering
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="challenges")
     auth_logs = relationship("AuthLog", back_populates="challenge")
