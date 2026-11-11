@@ -285,36 +285,80 @@ If 0 rows affected, the token was:
 
 ## Phrase Generation
 
-### Dynamic Phrases (60% probability)
+**Status:** IMPLEMENTED (November 11, 2026)
+
+### Extensive Word Pools
+
+All phrases are dynamically generated from extensive word pools:
+
+| Category | Count | Examples |
+|----------|-------|----------|
+| Numbers | 29 | zero, one, twelve, forty, hundred |
+| Colors | 50 | crimson, jade, turquoise, lavender, cobalt |
+| Animals | 57 | falcon, phoenix, dolphin, panther, hedgehog |
+| Objects | 53 | shield, crystal, lighthouse, rainbow, fortress |
+| Concepts | 49 | nexus, harmony, courage, destiny, legacy |
+| Adjectives | 53 | swift, noble, radiant, eternal, majestic |
+| Verbs | 53 | soar, guard, discover, pioneer, navigate |
+| Places | 35 | summit, harbor, gateway, boulevard, terminal |
+| Time Words | 20 | dawn, twilight, solstice, epoch, midnight |
+
+**Total unique words:** 399
+
+### 12 Phrase Templates
 
 ```python
-NUMBERS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
-COLOURS = ["red", "blue", "green", "amber", "silver", "crimson", "golden", "violet"]
-OBJECTS = ["falcon", "phoenix", "panther", "sapphire", "nexus", "echo", "matrix", "shield"]
+# Template 1: "Say: NUMBER COLOR ANIMAL NUMBER"
+"Say: eleven mint eagle three"
 
-def _generate_dynamic_phrase() -> str:
-    n1 = random.choice(NUMBERS)
-    col = random.choice(COLOURS)
-    obj = random.choice(OBJECTS)
-    n2 = random.choice(NUMBERS)
-    return f"Say: {n1} {col} {obj} {n2}"
+# Template 2: "Say: COLOR ADJECTIVE OBJECT"
+"Say: yellow premier window"
+
+# Template 3: "Say: ADJECTIVE COLOR ANIMAL VERB"
+"Say: swift crimson falcon soar"
+
+# Template 4: "Say: NUMBER CONCEPT COLOR PLACE"
+"Say: twelve harmony jade summit"
+
+# Template 5: "Say: COLOR ANIMAL PLACE NUMBER"
+"Say: cobalt phoenix harbor five"
+
+# Template 6: "Say: ADJECTIVE CONCEPT VERB OBJECT"
+"Say: noble courage guard shield"
+
+# Template 7: "Say: NUMBER ADJECTIVE ANIMAL TIME"
+"Say: seven brave wolf dawn"
+
+# Template 8: "The ADJECTIVE COLOR ANIMAL VERB"
+"The grand violet cougar climb"
+
+# Template 9: "VERB the ADJECTIVE OBJECT at TIME"
+"Roam the noble tower at noon"
+
+# Template 10: "A COLOR ANIMAL guards the CONCEPT"
+"A cobalt phoenix guards the legacy"
+
+# Template 11: "The CONCEPT of NUMBER ADJECTIVE OBJECTS"
+"The dream of twelve brave moonlight"
+
+# Template 12: "From PLACE to PLACE the ANIMAL travels"
+"From boulevard to clearing the pelican travels"
 ```
 
-**Example:** "Say: seven crimson falcon four"
+### Entropy Calculation
 
-**Entropy:** 9 × 8 × 8 × 9 = 5,184 combinations
+| Template | Combinations |
+|----------|-------------|
+| Template 1 (num-color-animal-num) | 2,396,850 |
+| Template 2 (color-adj-object) | 140,450 |
+| Template 3 (adj-color-animal-verb) | 8,005,650 |
+| Templates 4-12 | Millions more |
 
-### Static Phrases (40% probability)
+**Total unique phrases:** Tens of millions
 
-```python
-STATIC_PHRASES = [
-    "The quick brown fox jumps over the lazy dog",
-    "My voice is my secure biometric key",
-    "Authenticate me with this adaptive challenge phrase",
-    "Zero trust voice verification protocol",
-    "Security verification in progress now",
-]
-```
+### No Static Phrases
+
+All phrases are dynamically generated. No fixed phrase list exists.
 
 ---
 
