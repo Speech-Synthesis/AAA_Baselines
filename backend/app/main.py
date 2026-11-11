@@ -1,6 +1,11 @@
 """
 AAA Engine API - Navadeep
 Orchestrates L2 → L1 → L3 pipeline
+
+Updated by Surya (Nov 11, 2026):
+- Added v1 API router with health/readiness endpoints
+- Centralized configuration via core.config
+- Legacy routes preserved for backward compatibility
 """
 
 import os
@@ -23,26 +28,40 @@ from .layer2_deepfake import detect_spoof
 from .layer3_adaptive import generate_challenge, verify_token, update_voiceprint, get_token_user_id, get_token_phrase
 from .layer3_asr import verify_phrase
 
+# Import v1 API router
+from .api.v1 import router as v1_router
+from .core.config import get_settings
+
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
+
+settings = get_settings()
 
 app = FastAPI(
     title="AAA Engine",
     description="Adaptive Audio Authentication with Deepfake Detection",
-    version="0.1.0"
+    version="1.0.0"
 )
 
-# CORS for frontend
+# Include v1 API router
+app.include_router(v1_router)
+
+# CORS for frontend - using settings for origins
+# Note: Wildcard patterns preserved for backward compatibility
+# TODO: Restrict to specific origins in production
+cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else []
+cors_origins.extend([
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "https://aaa-frontend.onrender.com",
+    "https://*.onrender.com",
+    "https://*.hf.space"
+])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "https://aaa-frontend.onrender.com",
-        "https://*.onrender.com",
-        "https://*.hf.space"
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,10 +72,10 @@ STATIC_DIR = Path(__file__).parent.parent / "static"
 if STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
-# Thresholds (tune in Phase 2)
-L2_SPOOF_THRESHOLD = 0.5  # Reject if spoof confidence > this
-L1_SIMILARITY_THRESHOLD = 0.50  # Reject if speaker similarity < this
-ASR_PHRASE_THRESHOLD = 0.6  # Reject if phrase similarity < this
+# Thresholds - now configurable via environment
+L2_SPOOF_THRESHOLD = settings.L2_SPOOF_THRESHOLD
+L1_SIMILARITY_THRESHOLD = settings.L1_SIMILARITY_THRESHOLD
+ASR_PHRASE_THRESHOLD = settings.ASR_PHRASE_THRESHOLD
 
 
 # === Request/Response Models ===
