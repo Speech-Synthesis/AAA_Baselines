@@ -32,6 +32,9 @@ pydantic>=2.5.0
 pydantic-settings>=2.0.0
 huggingface-hub>=0.20.0
 
+# Rate limiting
+slowapi>=0.1.9
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
