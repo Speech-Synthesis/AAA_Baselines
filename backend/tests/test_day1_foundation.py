@@ -154,24 +154,69 @@ class TestSchemas:
 class TestChallengeValidation:
     """Tests for challenge token validation."""
 
-    def test_invalid_token_rejected(self, client):
+    def test_invalid_token_rejected(self, db_session):
         """Invalid token should be rejected."""
-        # This test verifies the token validation logic
         from app.layer3_adaptive import verify_token
-        result = verify_token("invalid-token-that-does-not-exist")
+        result = verify_token("invalid-token-that-does-not-exist", db_session)
         assert result is False
 
-    def test_empty_token_rejected(self, client):
+    def test_empty_token_rejected(self, db_session):
         """Empty token should be rejected."""
         from app.layer3_adaptive import verify_token
-        result = verify_token("")
+        result = verify_token("", db_session)
         assert result is False
 
-    def test_none_token_rejected(self, client):
+    def test_none_token_rejected(self, db_session):
         """None token should be rejected."""
         from app.layer3_adaptive import verify_token
-        result = verify_token(None)
+        result = verify_token(None, db_session)
         assert result is False
+
+    def test_token_without_db_rejected(self):
+        """Token without database session should be rejected."""
+        from app.layer3_adaptive import verify_token
+        result = verify_token("some-token", None)
+        assert result is False
+
+
+class TestSecretConfiguration:
+    """Tests for HMAC secret configuration."""
+
+    def test_missing_secret_raises_in_production(self):
+        """Missing L3_HMAC_SECRET should raise error in production mode."""
+        import os
+        import sys
+        import importlib
+
+        # Save original values
+        orig_debug = os.environ.get("DEBUG")
+        orig_secret = os.environ.get("L3_HMAC_SECRET")
+
+        try:
+            # Set production mode (DEBUG=false) and remove secret
+            os.environ["DEBUG"] = "false"
+            if "L3_HMAC_SECRET" in os.environ:
+                del os.environ["L3_HMAC_SECRET"]
+
+            # Remove cached module to force re-import
+            if "app.layer3_adaptive" in sys.modules:
+                del sys.modules["app.layer3_adaptive"]
+
+            # Import should raise MissingSecretError
+            from app.core.exceptions import MissingSecretError
+            with pytest.raises(MissingSecretError):
+                import app.layer3_adaptive
+        finally:
+            # Restore original values
+            if orig_debug is not None:
+                os.environ["DEBUG"] = orig_debug
+            else:
+                os.environ.pop("DEBUG", None)
+            if orig_secret is not None:
+                os.environ["L3_HMAC_SECRET"] = orig_secret
+            # Clean up module cache
+            if "app.layer3_adaptive" in sys.modules:
+                del sys.modules["app.layer3_adaptive"]
 
 
 class TestDefaultDenyBehavior:
