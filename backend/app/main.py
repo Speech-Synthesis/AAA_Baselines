@@ -31,6 +31,9 @@ from .layer3_asr import verify_phrase
 # Import v1 API router
 from .api.v1 import router as v1_router
 from .core.config import get_settings
+from .core.ratelimit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from fastapi import Request
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -42,6 +45,10 @@ app = FastAPI(
     description="Adaptive Audio Authentication with Deepfake Detection",
     version="1.0.0"
 )
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Include v1 API router
 app.include_router(v1_router)
@@ -180,7 +187,9 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/enroll", response_model=EnrollResponse)
+@limiter.limit(settings.RATE_LIMIT_ENROLL)
 async def enroll(
+    request: Request,
     user_id: str = Form(...),
     audio: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -223,7 +232,9 @@ async def enroll(
 
 
 @app.get("/auth/challenge", response_model=ChallengeResponse)
+@limiter.limit(settings.RATE_LIMIT_CHALLENGES)
 async def get_challenge(
+    request: Request,
     user_id: str = Query(...),
     db: Session = Depends(get_db)
 ):
@@ -254,7 +265,9 @@ async def get_challenge(
 
 
 @app.post("/auth/verify", response_model=VerifyResponse)
+@limiter.limit(settings.RATE_LIMIT_VERIFY)
 async def verify(
+    request: Request,
     user_id: str = Form(...),
     token: str = Form(...),
     audio: UploadFile = File(...),

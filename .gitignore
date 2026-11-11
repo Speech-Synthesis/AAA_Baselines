@@ -48,3 +48,7 @@ nul
 
 # Internal docs (not for repo)
 ISSUES_TODO.md
+
+# Test databases
+*.db
+test_*.db

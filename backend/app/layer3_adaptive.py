@@ -12,8 +12,23 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional
 
-# Secret key for HMAC token signing (can be loaded from environment)
-SECRET_KEY = os.getenv("L3_HMAC_SECRET", "aaa_engine_l3_adaptive_secret_key_2026").encode()
+# Secret key for HMAC token signing (MUST be set via environment variable)
+_hmac_secret = os.environ.get("L3_HMAC_SECRET")
+if not _hmac_secret:
+    # Allow import to succeed in DEBUG mode for development/testing
+    # Production MUST have L3_HMAC_SECRET set
+    import warnings
+    if os.environ.get("DEBUG", "").lower() in ("true", "1", "yes"):
+        warnings.warn(
+            "L3_HMAC_SECRET not set - using insecure default for DEBUG mode only",
+            RuntimeWarning
+        )
+        _hmac_secret = "INSECURE_DEBUG_SECRET_DO_NOT_USE_IN_PRODUCTION"
+    else:
+        from .core.exceptions import MissingSecretError
+        raise MissingSecretError("L3_HMAC_SECRET environment variable must be set")
+
+SECRET_KEY = _hmac_secret.encode()
 
 # =============================================================================
 # EXTENSIVE WORD POOLS FOR UNIQUE PHRASE GENERATION
@@ -187,103 +202,250 @@ def _generate_dynamic_phrase() -> str:
         # Sentence: "From PLACE to PLACE the ANIMAL travels"
         return f"From {random.choice(PLACES)} to {random.choice(PLACES)} the {random.choice(ANIMALS)} travels"
 
-# In-memory token store: maps token_str -> token_metadata
-_token_store: dict[str, dict] = {}
+# =============================================================================
+# DATABASE-BACKED TOKEN PERSISTENCE
+# Replaces in-memory storage for production reliability
+# =============================================================================
+
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 
-def generate_challenge(user_id: str) -> dict:
+def generate_challenge(user_id: str, db: Session = None) -> dict:
     """
     Generate a dynamic challenge phrase and single-use HMAC-SHA256 signed token with 90s TTL.
 
+    If db session is provided, persists the challenge to database.
+    If db is None, returns the challenge without persistence (for testing/legacy).
+
     Args:
         user_id: UUID of the user requesting authentication
+        db: Optional SQLAlchemy session for persistence
 
     Returns:
-        {"phrase": str, "token": str, "expires_at": datetime}
+        {"phrase": str, "token": str, "expires_at": datetime, "challenge_id": str (if persisted)}
     """
     phrase = _generate_dynamic_phrase()
-    
+
     # Expiration: strictly 90 seconds (per shared contract section 6 & layer3 spec)
     now = datetime.utcnow()
     expires_at = now + timedelta(seconds=90)
     expires_timestamp = str(int(expires_at.timestamp()))
-    
+
     # Create raw payload and sign with HMAC-SHA256
     raw_nonce = secrets.token_hex(16)
     raw_payload = f"{user_id}:{expires_timestamp}:{phrase}:{raw_nonce}"
     signature = hmac.new(SECRET_KEY, raw_payload.encode('utf-8'), hashlib.sha256).hexdigest()
-    
+
     # URL-safe HMAC token
     token = f"{raw_nonce}.{expires_timestamp}.{signature}"
 
-    # Store token for single-use & tracking
-    _token_store[token] = {
-        "user_id": user_id,
-        "phrase": phrase,
-        "expires_at": expires_at,
-        "payload": raw_payload,
-        "signature": signature,
-        "used": False
-    }
-
-    return {
+    result = {
         "phrase": phrase,
         "token": token,
         "expires_at": expires_at
     }
 
+    # Persist to database if session provided
+    if db is not None:
+        from .models import Challenge
+        import uuid
 
-def verify_token(token: str) -> bool:
+        challenge = Challenge(
+            id=uuid.uuid4(),
+            user_id=uuid.UUID(user_id) if isinstance(user_id, str) else user_id,
+            phrase=phrase,
+            token=token,
+            signature=signature,
+            payload=raw_payload,
+            expires_at=expires_at,
+            used=False
+        )
+        db.add(challenge)
+        db.commit()
+        db.refresh(challenge)
+        result["challenge_id"] = str(challenge.id)
+
+    return result
+
+
+def verify_token(token: str, db: Session = None) -> bool:
     """
     Verify token is valid (exists, HMAC valid, not expired, not used).
     Enforces single-use by marking token as used immediately.
 
+    Uses atomic database operations to prevent race conditions.
+
     Args:
         token: Challenge token to verify
+        db: Optional SQLAlchemy session for database verification
 
     Returns:
         True if token is valid and now consumed, False otherwise
     """
-    if not token or token not in _token_store:
+    if not token:
         return False
 
-    token_data = _token_store[token]
-
-    # 1. Single-use check
-    if token_data.get("used", False):
+    if db is None:
+        # Legacy behavior: no database, always return False
         return False
 
-    # 2. TTL Expiration check (90s limit)
+    from .models import Challenge
+
     now = datetime.utcnow()
-    if now > token_data["expires_at"]:
-        # Remove expired token
-        del _token_store[token]
+
+    # Atomic update: Mark as used only if not already used and not expired
+    # This prevents race conditions where two requests try to use the same token
+    result = db.execute(
+        text("""
+            UPDATE challenges
+            SET used = 1
+            WHERE token = :token
+              AND used = 0
+              AND expires_at > :now
+        """),
+        {"token": token, "now": now}
+    )
+    db.commit()
+
+    # If no rows affected, token was invalid, already used, or expired
+    if result.rowcount == 0:
         return False
 
-    # 3. HMAC Signature integrity check
-    raw_payload = token_data.get("payload", "")
-    expected_sig = hmac.new(SECRET_KEY, raw_payload.encode('utf-8'), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(token_data.get("signature", ""), expected_sig):
-        return False
-
-    # Consume token (single-use enforcement)
-    token_data["used"] = True
+    # Verify HMAC signature
+    challenge = db.query(Challenge).filter(Challenge.token == token).first()
+    if challenge and challenge.payload:
+        expected_sig = hmac.new(SECRET_KEY, challenge.payload.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(challenge.signature or "", expected_sig):
+            # Signature mismatch - revert the used flag and return False
+            db.execute(
+                text("UPDATE challenges SET used = 0 WHERE token = :token"),
+                {"token": token}
+            )
+            db.commit()
+            return False
 
     return True
 
 
-def get_token_user_id(token: str) -> Optional[str]:
+def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
+    """
+    Atomically validate and consume a challenge token.
+
+    Returns challenge data if valid, None otherwise.
+    This is the recommended function for production use.
+
+    Args:
+        token: Challenge token to verify
+        db: SQLAlchemy session (required)
+
+    Returns:
+        dict with challenge data if valid, None otherwise
+    """
+    from .models import Challenge
+
+    if not token or not db:
+        return None
+
+    now = datetime.utcnow()
+
+    # Atomic update: Mark as used only if not already used and not expired
+    result = db.execute(
+        text("""
+            UPDATE challenges
+            SET used = 1
+            WHERE token = :token
+              AND used = 0
+              AND expires_at > :now
+        """),
+        {"token": token, "now": now}
+    )
+    db.commit()
+
+    # If no rows affected, token was invalid, already used, or expired
+    if result.rowcount == 0:
+        return None
+
+    # Fetch the challenge data
+    challenge = db.query(Challenge).filter(Challenge.token == token).first()
+    if not challenge:
+        return None
+
+    # Verify HMAC signature
+    if challenge.payload:
+        expected_sig = hmac.new(SECRET_KEY, challenge.payload.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(challenge.signature or "", expected_sig):
+            # Signature mismatch - revert the used flag and return None
+            db.execute(
+                text("UPDATE challenges SET used = 0 WHERE token = :token"),
+                {"token": token}
+            )
+            db.commit()
+            return None
+
+    return {
+        "challenge_id": str(challenge.id),
+        "user_id": str(challenge.user_id),
+        "phrase": challenge.phrase,
+        "token": challenge.token,
+        "expires_at": challenge.expires_at
+    }
+
+
+def get_token_user_id(token: str, db: Session = None) -> Optional[str]:
     """Get the user_id associated with a token."""
-    if token in _token_store:
-        return _token_store[token]["user_id"]
+    if not token:
+        return None
+
+    if db is None:
+        return None
+
+    from .models import Challenge
+    challenge = db.query(Challenge).filter(Challenge.token == token).first()
+    if challenge:
+        return str(challenge.user_id)
     return None
 
 
-def get_token_phrase(token: str) -> Optional[str]:
+def get_token_phrase(token: str, db: Session = None) -> Optional[str]:
     """Get the challenge phrase associated with a token."""
-    if token in _token_store:
-        return _token_store[token]["phrase"]
+    if not token:
+        return None
+
+    if db is None:
+        return None
+
+    from .models import Challenge
+    challenge = db.query(Challenge).filter(Challenge.token == token).first()
+    if challenge:
+        return challenge.phrase
     return None
+
+
+def cleanup_expired_tokens(db: Session) -> int:
+    """
+    Remove expired challenge tokens from database.
+
+    Should be called periodically (e.g., via background task or cron).
+
+    Args:
+        db: SQLAlchemy session
+
+    Returns:
+        Number of tokens deleted
+    """
+    now = datetime.utcnow()
+    result = db.execute(
+        text("DELETE FROM challenges WHERE expires_at < :now"),
+        {"now": now}
+    )
+    db.commit()
+    return result.rowcount
+
+
+# Legacy in-memory store for backward compatibility with tests
+# WARNING: Do not use in production - use database-backed functions instead
+_token_store: dict[str, dict] = {}
 
 
 def update_voiceprint(
