@@ -3,4 +3,30 @@ AAA Engine Security Package
 Perimeter defense, tenant isolation, and client authentication.
 """
 
-__all__ = []
+from .jwt_auth import (
+    router,
+    get_current_tenant,
+    enforce_rate_limit,
+    enforce_lockout_policy,
+    configure_cors,
+    verify_client_credentials,
+    validate_jwt_secret,
+    create_tenant_token,
+    TokenRequest,
+    TokenResponse,
+    TokenPayload,
+)
+
+__all__ = [
+    "router",
+    "get_current_tenant",
+    "enforce_rate_limit",
+    "enforce_lockout_policy",
+    "configure_cors",
+    "verify_client_credentials",
+    "validate_jwt_secret",
+    "create_tenant_token",
+    "TokenRequest",
+    "TokenResponse",
+    "TokenPayload",
+]

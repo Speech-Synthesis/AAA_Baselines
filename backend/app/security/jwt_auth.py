@@ -292,3 +292,28 @@ def enforce_lockout_policy(
         else:
             _LOCKED_ENTITIES.pop(key, None)
             _LOCKOUT_FAILURES.pop(key, None)
+
+def configure_cors(app: Any) -> None:
+    raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+    parsed_origins: List[str] = []
+    if raw_origins and raw_origins.strip():
+        parsed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
+
+    wildcard_detected = any("*" in origin for origin in parsed_origins)
+    if wildcard_detected:
+        logger.critical(
+            "CRITICAL SECURITY ALERT: Wildcard '*' detected in ALLOWED_ORIGINS configuration. "
+            "Wildcard origins are strictly prohibited on authenticated AAA middleware. "
+            "Rejecting configuration and defaulting to an empty list [] to block all cross-origin requests."
+        )
+        allowed_origins: List[str] = []
+    else:
+        allowed_origins = parsed_origins
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True if allowed_origins else False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+    )
