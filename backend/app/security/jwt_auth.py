@@ -191,3 +191,42 @@ def exchange_token(request: TokenRequest) -> TokenResponse:
         token_type="bearer",
         expires_in=TOKEN_EXPIRATION_SECONDS,
     )
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=False)
+
+def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="INVALID_CREDENTIALS",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="TOKEN_EXPIRED",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except (JWTClaimsError, JWTError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="INVALID_CREDENTIALS",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    tenant_id: Optional[str] = payload.get("tenant_id") or payload.get("sub")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="INVALID_CREDENTIALS",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return tenant_id
