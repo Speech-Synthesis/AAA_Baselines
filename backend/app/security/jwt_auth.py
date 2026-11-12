@@ -42,4 +42,17 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
             "FATAL SECURITY FAILURE: 'AAA_JWT_SECRET' environment variable is missing or empty. "
             "Server startup aborted. Cryptographic keys must be explicitly provided in deployment."
         )
-    return str(key).strip()
+    key_str = str(key).strip()
+    if len(key_str) < MINIMUM_KEY_LENGTH:
+        raise RuntimeError(
+            f"FATAL SECURITY FAILURE: 'AAA_JWT_SECRET' length is {len(key_str)} chars, which is under "
+            f"the required minimum of {MINIMUM_KEY_LENGTH} characters (256-bit entropy). "
+            "Server startup aborted."
+        )
+    unique_chars = len(set(key_str))
+    if unique_chars < 6:
+        raise RuntimeError(
+            "FATAL SECURITY FAILURE: 'AAA_JWT_SECRET' entropy is dangerously low (insufficient unique characters). "
+            "Server startup aborted."
+        )
+    return key_str
