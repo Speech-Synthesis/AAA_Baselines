@@ -126,17 +126,12 @@ _MOCK_API_CLIENTS: Dict[str, Dict[str, Any]] = {
 }
 
 def register_mock_api_client(client_id: str, client_secret: str, allowed_tenants: List[str]) -> None:
-    """Helper to dynamically register API clients for automated integration tests."""
     _MOCK_API_CLIENTS[client_id] = {
         "secret_hash": hashlib.sha256(client_secret.encode()).hexdigest(),
         "allowed_tenants": allowed_tenants,
     }
 
 def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str) -> bool:
-    """
-    Verifies server-to-server client credentials using constant-time hash comparison.
-    Timing-attack resistant comparison (hmac.compare_digest) is enforced.
-    """
     client_record = _MOCK_API_CLIENTS.get(client_id)
     if not client_record:
         dummy_hash = hashlib.sha256(b"dummy").hexdigest()
@@ -147,3 +142,20 @@ def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str
     allowed_tenants = client_record.get("allowed_tenants", [])
     is_tenant_valid = tenant_id in allowed_tenants or "*" in allowed_tenants
     return is_secret_valid and is_tenant_valid
+
+def create_tenant_token(tenant_id: str, client_id: str, expires_in_seconds: int = TOKEN_EXPIRATION_SECONDS) -> str:
+    """
+    Issues a cryptographically signed JWT binding tenant_id to the token payload.
+    """
+    now = int(time.time())
+    payload = {
+        "sub": tenant_id,
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "aud": JWT_AUDIENCE,
+        "iss": JWT_ISSUER,
+        "iat": now,
+        "exp": now + expires_in_seconds,
+        "jti": str(uuid.uuid4()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
