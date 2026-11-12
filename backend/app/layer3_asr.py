@@ -4,36 +4,34 @@ Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expecte
 Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase matcher.
 """
 
+from __future__ import annotations
+
+import difflib
 import io
 import os
 import sys
-import tempfile
-import difflib
-import re
-from typing import Tuple
+
+import numpy as np
+import soundfile as sf
+import torch
+import whisper
+
+# Integration with approved AAA-ASR deterministic phrase matcher
+from .aaa_asr.phrase_matcher import (
+    normalize_text as aaa_normalize_text,
+)
+from .aaa_asr.phrase_matcher import (
+    verify_phrase as aaa_verify_phrase,
+)
 
 # Fix Windows console encoding issues
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
         sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
+    except (AttributeError, io.UnsupportedOperation, OSError):  # noqa: S110
         pass
 
-import torch
-import whisper
-import soundfile as sf
-import numpy as np
-
-# Integration with approved AAA-ASR deterministic phrase matcher
-from .aaa_asr.phrase_matcher import (
-    PhraseVerifier,
-    normalize_text as aaa_normalize_text,
-    verify_phrase as aaa_verify_phrase
-)
-
-# Whisper model - use "base" for good balance of speed/accuracy
-# Options: tiny, base, small, medium, large
 _MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
 _whisper_model = None
 
@@ -44,7 +42,7 @@ def _get_whisper_model():
     if _whisper_model is None:
         print(f"[L3-ASR] Loading Whisper model: {_MODEL_SIZE}")
         _whisper_model = whisper.load_model(_MODEL_SIZE)
-        print(f"[L3-ASR] Whisper model loaded successfully")
+        print("[L3-ASR] Whisper model loaded successfully")
     return _whisper_model
 
 
@@ -120,7 +118,7 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcript
 
 
-def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> Tuple[bool, float, str]:
+def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
     Updated for Day 1: Uses deterministic exact matching after safe normalization.

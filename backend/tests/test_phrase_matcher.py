@@ -13,27 +13,27 @@ Categories covered:
 11-15: Missing words, extra words, repeated words, reordered words, incorrect numbers
 16-20: Empty transcript, empty expected, whitespace-only, no-speech, low-confidence
 21-25: Too-short audio, expired challenge, invalid inputs, homophones, punctuation-only
-26-30: Repeated punctuation, normalization collisions, Unicode/apostrophe, 
+26-30: Repeated punctuation, normalization collisions, Unicode/apostrophe,
        regression against old fuzzy matching, near-miss rejection
 
 Run with:
     python -m pytest backend/tests/test_phrase_matcher.py -v
 """
 
-import sys
 import os
+import sys
+
 import pytest
 
 # Add backend to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.aaa_asr.phrase_matcher import (
-    PhraseVerifier,
     PhraseResult,
+    PhraseVerifier,
     normalize_text,
     verify_phrase,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -51,7 +51,7 @@ def verifier():
 
 class TestExactMatch:
     """Test exact phrase matches that should produce OK."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("Seven Red Chair Twenty", "seven red chair twenty"),
         ("blue green yellow", "blue green yellow"),
@@ -76,7 +76,7 @@ class TestExactMatch:
 
 class TestCaseNormalization:
     """Test that case differences are normalized correctly."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("Seven Red Chair Twenty", "SEVEN RED CHAIR TWENTY"),
         ("HELLO WORLD", "hello world"),
@@ -98,7 +98,7 @@ class TestCaseNormalization:
 
 class TestPunctuation:
     """Test that punctuation is stripped correctly."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("hello, world!", "hello world"),
         ("hello world", "hello, world!"),
@@ -118,7 +118,7 @@ class TestPunctuation:
 
 class TestWhitespace:
     """Test whitespace normalization."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("  seven red chair twenty  ", "seven red chair twenty"),
         ("seven red chair twenty", "  seven red chair twenty  "),
@@ -141,7 +141,7 @@ class TestWhitespace:
 
 class TestFillerWords:
     """Test that approved filler words are removed."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "um seven red chair twenty"),
         ("seven red chair twenty", "seven uh red chair twenty"),
@@ -163,7 +163,7 @@ class TestFillerWords:
 
 class TestDigitConversion:
     """Test digit <-> word normalization."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "7 red chair 20"),
         ("7 red chair 20", "seven red chair twenty"),
@@ -184,7 +184,7 @@ class TestDigitConversion:
 
 class TestMissingWords:
     """Test that missing words cause MISMATCH."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "seven red chair"),
         ("seven red chair twenty", "seven red twenty"),
@@ -207,7 +207,7 @@ class TestMissingWords:
 
 class TestExtraWords:
     """Test that extra words cause MISMATCH."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "seven red chair twenty five"),
         ("seven red chair twenty", "please seven red chair twenty"),
@@ -228,7 +228,7 @@ class TestExtraWords:
 
 class TestRepeatedWords:
     """Test that repeated words cause MISMATCH (not collapsed)."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "seven seven red chair twenty"),
         ("seven red chair twenty", "seven red red chair twenty"),
@@ -249,7 +249,7 @@ class TestRepeatedWords:
 
 class TestReorderedWords:
     """Test that reordered words cause MISMATCH."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("seven red chair twenty", "twenty chair red seven"),
         ("seven red chair twenty", "red seven chair twenty"),
@@ -270,7 +270,7 @@ class TestReorderedWords:
 
 class TestIncorrectNumbers:
     """Test that incorrect numbers cause MISMATCH."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("Seven Red Chair Twenty", "Seven Red Chair Thirty"),
         ("seven red chair twenty", "seven red chair nineteen"),
@@ -291,7 +291,7 @@ class TestIncorrectNumbers:
 
 class TestEmptyTranscript:
     """Test handling of empty or missing transcripts."""
-    
+
     def test_empty_string_transcript(self):
         result = verify_phrase(expected="seven red chair twenty", transcript="")
         assert result.code == "NO_SPEECH"
@@ -319,7 +319,7 @@ class TestEmptyTranscript:
 
 class TestEmptyExpected:
     """Test handling of empty expected phrases."""
-    
+
     def test_empty_expected(self):
         result = verify_phrase(expected="", transcript="seven red chair twenty")
         assert result.code == "MISMATCH"
@@ -337,7 +337,7 @@ class TestEmptyExpected:
 
 class TestNoSpeech:
     """Test no-speech probability handling."""
-    
+
     def test_high_no_speech_prob(self):
         result = verify_phrase(
             expected="seven red chair twenty",
@@ -373,7 +373,7 @@ class TestNoSpeech:
 
 class TestLowConfidence:
     """Test confidence threshold enforcement."""
-    
+
     def test_low_confidence_rejected(self):
         result = verify_phrase(
             expected="seven red chair twenty",
@@ -419,7 +419,7 @@ class TestLowConfidence:
 
 class TestTooShort:
     """Test audio duration minimum enforcement (1.0s min per SHARED.md)."""
-    
+
     def test_too_short_audio(self):
         result = verify_phrase(
             expected="seven red chair twenty",
@@ -465,7 +465,7 @@ class TestTooShort:
 
 class TestExpiredChallenge:
     """Test expired challenge handling."""
-    
+
     def test_expired_challenge_rejected(self):
         result = verify_phrase(
             expected="seven red chair twenty",
@@ -502,7 +502,7 @@ class TestExpiredChallenge:
 
 class TestInvalidInputs:
     """Test handling of invalid input types."""
-    
+
     def test_none_transcript(self):
         result = verify_phrase(expected="hello world", transcript=None)
         assert result.code == "NO_SPEECH"
@@ -530,7 +530,7 @@ class TestInvalidInputs:
 
 class TestHomophones:
     """Test homophone and minimal-pair handling from curated vocabulary."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("red", "read"),         # Different words
         ("four", "for"),         # Homophone but different spelling
@@ -552,7 +552,7 @@ class TestHomophones:
 
 class TestPunctuationOnly:
     """Test handling of punctuation-only inputs."""
-    
+
     def test_punctuation_only_transcript(self):
         result = verify_phrase(expected="hello world", transcript="...")
         assert result.code == "NO_SPEECH"
@@ -575,7 +575,7 @@ class TestPunctuationOnly:
 
 class TestRepeatedPunctuation:
     """Test handling of repeated punctuation around words."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("hello world", "hello... world..."),
         ("hello world", "hello!!! world!!!"),
@@ -593,7 +593,7 @@ class TestRepeatedPunctuation:
 
 class TestNormalizationCollisions:
     """Test that normalization doesn't cause false matches."""
-    
+
     def test_oh_becomes_zero(self):
         """'oh' is aliased to 'zero' for digit context."""
         result = verify_phrase(expected="zero", transcript="oh")
@@ -617,7 +617,7 @@ class TestNormalizationCollisions:
 
 class TestUnicode:
     """Test Unicode normalization and apostrophe handling."""
-    
+
     def test_curly_apostrophe(self):
         """Curly apostrophes should be normalized via NFKC."""
         result = verify_phrase(expected="don't stop", transcript="don't stop")
@@ -653,25 +653,25 @@ class TestFuzzyRejection:
     Regression tests: phrases that the OLD fuzzy SequenceMatcher at
     threshold 0.6 would have accepted, but MUST now be rejected.
     """
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         # One word different (high similarity ~0.75+)
         ("seven red chair twenty", "seven red chair thirty"),
         ("seven red chair twenty", "seven red sofa twenty"),
         ("seven red chair twenty", "seven blue chair twenty"),
-        
+
         # Very similar but not identical
         ("open close start stop", "open close start shop"),
         ("blue green yellow red", "blue green yellow bed"),
-        
+
         # Missing one word (still high similarity)
         ("seven red chair twenty", "seven red twenty"),
         ("alpha bravo charlie delta", "alpha bravo charlie"),
-        
+
         # One extra word
         ("seven red chair", "seven red chair twenty"),
         ("hello world", "hello there world"),
-        
+
         # Near-homophone substitution
         ("seven red chair twenty", "seven read chair twenty"),
     ])
@@ -688,7 +688,7 @@ class TestFuzzyRejection:
 
 class TestSpellingVariants:
     """Test British/American spelling normalization."""
-    
+
     @pytest.mark.parametrize("expected,transcript", [
         ("color red blue", "colour red blue"),
         ("favorite green", "favourite green"),
@@ -708,7 +708,7 @@ class TestSpellingVariants:
 
 class TestNormalization:
     """Direct tests of the normalize_text function."""
-    
+
     def test_basic_lowercase(self):
         assert normalize_text("HELLO WORLD") == "hello world"
 
@@ -755,7 +755,7 @@ class TestNormalization:
 
 class TestPhraseVerifierClass:
     """Test the PhraseVerifier class directly."""
-    
+
     def test_custom_confidence_threshold(self):
         verifier = PhraseVerifier(confidence_threshold=0.8)
         result = verifier.verify(
@@ -795,7 +795,7 @@ class TestPhraseVerifierClass:
 
 class TestSecurityInvariants:
     """Test critical security invariants."""
-    
+
     def test_high_confidence_cannot_fix_mismatch(self):
         """SECURITY: High confidence must NEVER turn a mismatch into OK."""
         result = verify_phrase(
@@ -864,7 +864,7 @@ class TestSecurityInvariants:
 
 class TestEdgeCases:
     """Additional edge cases."""
-    
+
     def test_single_word_match(self):
         result = verify_phrase(expected="seven", transcript="seven")
         assert result.code == "OK"

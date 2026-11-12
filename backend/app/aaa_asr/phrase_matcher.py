@@ -21,11 +21,11 @@ Normalization pipeline (applied to both expected and recognized text identically
 Result codes: OK, MISMATCH, LOW_CONF, NO_SPEECH, TOO_SHORT, TIMEOUT, EXPIRED_CHALLENGE
 """
 
-from dataclasses import dataclass, field
-from typing import Optional
+from __future__ import annotations
+
 import re
 import unicodedata
-
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Result Data Class
@@ -34,7 +34,7 @@ import unicodedata
 @dataclass
 class PhraseResult:
     """Verification result from the phrase matcher.
-    
+
     Attributes:
         code: One of OK, MISMATCH, LOW_CONF, NO_SPEECH, TOO_SHORT, TIMEOUT, EXPIRED_CHALLENGE
         match: Whether the phrase matched exactly after normalization
@@ -49,7 +49,7 @@ class PhraseResult:
     hypothesis: str = ""
     normalized_hyp: str = ""
     normalized_expected: str = ""
-    confidence: Optional[float] = None
+    confidence: float | None = None
     reason: str = ""
 
 
@@ -165,10 +165,10 @@ CONTRACTIONS = {
 def normalize_text(text: str) -> str:
     """
     Apply the approved normalization pipeline to a text string.
-    
+
     This function is deterministic and applies the SAME transformations
     to both expected challenge phrases and ASR transcripts.
-    
+
     Pipeline:
     1. Unicode NFKC normalization + lowercase
     2. Expand contractions
@@ -178,16 +178,16 @@ def normalize_text(text: str) -> str:
     6. Convert digits to word form
     7. Apply spelling normalization
     8. Apply word aliases (e.g., "oh" -> "zero")
-    
+
     Returns:
         Normalized text string
     """
     if not isinstance(text, str):
         return ""
-    
+
     # Step 1: Unicode NFKC + lowercase
     text = unicodedata.normalize("NFKC", text).lower().strip()
-    
+
     # Step 2: Expand contractions (before punctuation removal to catch apostrophes)
     for contraction, expansion in CONTRACTIONS.items():
         text = re.sub(
@@ -195,19 +195,19 @@ def normalize_text(text: str) -> str:
             expansion,
             text
         )
-    
+
     # Step 3: Strip punctuation and hyphens (keep alphanumeric and spaces)
     text = re.sub(r"[^\w\s]", " ", text)
     # Also replace underscores
     text = text.replace("_", " ")
-    
+
     # Step 4: Normalize whitespace
     text = re.sub(r"\s+", " ", text).strip()
-    
+
     # Step 5: Remove approved filler words
     words = text.split()
     words = [w for w in words if w not in FILLER_WORDS]
-    
+
     # Step 6: Convert digits to word form
     normalized_words = []
     for word in words:
@@ -217,13 +217,13 @@ def normalize_text(text: str) -> str:
         else:
             normalized_words.append(word)
     words = normalized_words
-    
+
     # Step 7: Apply spelling normalization
     words = [SPELLING_MAP.get(w, w) for w in words]
-    
+
     # Step 8: Apply word aliases
     words = [WORD_ALIASES.get(w, w) for w in words]
-    
+
     return " ".join(words)
 
 
@@ -234,58 +234,58 @@ def normalize_text(text: str) -> str:
 class PhraseVerifier:
     """
     Deterministic phrase verifier for AAA challenge-response authentication.
-    
+
     The verifier receives:
     - Expected challenge phrase (from server-side challenge record)
     - ASR transcript (hypothesis from Whisper)
     - Confidence score from ASR
     - Challenge validity information (expired, timeout, etc.)
-    
+
     It returns a PhraseResult with a deterministic verification decision.
-    
+
     SECURITY INVARIANTS:
     - An incorrect phrase NEVER becomes accepted because of a high confidence score.
     - An exact phrase with insufficient confidence MUST NOT be approved.
     - An expired challenge MUST NEVER be accepted.
     - Fail closed on any error.
     """
-    
+
     # Default confidence threshold
     DEFAULT_CONFIDENCE_THRESHOLD = 0.5
-    
+
     # Minimum audio duration in seconds (aligned with SHARED.md Section 2: < 1.0s = TOO_SHORT)
     MIN_AUDIO_DURATION = 1.0
-    
+
     def __init__(self, confidence_threshold: float = None):
         """
         Initialize the phrase verifier.
-        
+
         Args:
-            confidence_threshold: Minimum ASR confidence to accept. 
+            confidence_threshold: Minimum ASR confidence to accept.
                                   Defaults to DEFAULT_CONFIDENCE_THRESHOLD.
         """
         self.confidence_threshold = (
-            confidence_threshold 
-            if confidence_threshold is not None 
+            confidence_threshold
+            if confidence_threshold is not None
             else self.DEFAULT_CONFIDENCE_THRESHOLD
         )
-    
+
     def verify(
         self,
         expected: str,
         transcript: str,
-        confidence: Optional[float] = None,
-        audio_duration: Optional[float] = None,
-        no_speech_prob: Optional[float] = None,
+        confidence: float | None = None,
+        audio_duration: float | None = None,
+        no_speech_prob: float | None = None,
         challenge_expired: bool = False,
         challenge_timed_out: bool = False,
     ) -> PhraseResult:
         """
         Verify that a transcript matches the expected challenge phrase.
-        
+
         This is the ONLY entry point for phrase verification in the
         authentication path. It uses exact matching after safe normalization.
-        
+
         Args:
             expected: The expected challenge phrase (from server-side record)
             transcript: The ASR hypothesis text
@@ -294,12 +294,12 @@ class PhraseVerifier:
             no_speech_prob: Whisper's no-speech probability, None if unavailable
             challenge_expired: Whether the challenge has expired
             challenge_timed_out: Whether the challenge timed out
-            
+
         Returns:
             PhraseResult with verification decision
         """
         # ------- Pre-checks (fail closed) -------
-        
+
         # Check for expired challenge FIRST — never accept expired
         if challenge_expired:
             return PhraseResult(
@@ -307,7 +307,7 @@ class PhraseVerifier:
                 match=False,
                 reason="Challenge has expired. A new challenge is required.",
             )
-        
+
         # Check for timeout
         if challenge_timed_out:
             return PhraseResult(
@@ -315,7 +315,7 @@ class PhraseVerifier:
                 match=False,
                 reason="Challenge timed out. A new challenge is required.",
             )
-        
+
         # Validate inputs
         if not isinstance(expected, str) or not expected.strip():
             return PhraseResult(
@@ -323,7 +323,7 @@ class PhraseVerifier:
                 match=False,
                 reason="Expected phrase is empty or invalid.",
             )
-        
+
         if not isinstance(transcript, str) or not transcript.strip():
             return PhraseResult(
                 code="NO_SPEECH",
@@ -331,7 +331,7 @@ class PhraseVerifier:
                 hypothesis=transcript if isinstance(transcript, str) else "",
                 reason="No speech detected in the audio.",
             )
-        
+
         # Check audio duration if provided
         if audio_duration is not None and audio_duration < self.MIN_AUDIO_DURATION:
             return PhraseResult(
@@ -340,7 +340,7 @@ class PhraseVerifier:
                 hypothesis=transcript,
                 reason=f"Audio too short ({audio_duration:.1f}s). Minimum {self.MIN_AUDIO_DURATION}s required.",
             )
-        
+
         # Check no-speech probability if provided
         if no_speech_prob is not None and no_speech_prob > 0.8:
             return PhraseResult(
@@ -349,11 +349,11 @@ class PhraseVerifier:
                 hypothesis=transcript,
                 reason=f"High no-speech probability ({no_speech_prob:.2f}). No valid speech detected.",
             )
-        
+
         # ------- Normalization -------
         normalized_expected = normalize_text(expected)
         normalized_hyp = normalize_text(transcript)
-        
+
         # If transcript normalizes to empty (e.g. only punctuation, symbols, fillers),
         # no speech was recognized
         if not normalized_hyp:
@@ -365,7 +365,7 @@ class PhraseVerifier:
                 normalized_expected=normalized_expected,
                 reason="No speech or words recognized in the transcript.",
             )
-        
+
         # If expected normalizes to empty, invalid challenge phrase
         if not normalized_expected:
             return PhraseResult(
@@ -379,7 +379,7 @@ class PhraseVerifier:
 
         # ------- Exact comparison -------
         is_exact_match = (normalized_expected == normalized_hyp)
-        
+
         if not is_exact_match:
             return PhraseResult(
                 code="MISMATCH",
@@ -390,7 +390,7 @@ class PhraseVerifier:
                 confidence=confidence,
                 reason="Phrase does not match. One or more words differ.",
             )
-        
+
         # ------- Confidence check (can only tighten, never loosen) -------
         if confidence is not None and confidence < self.confidence_threshold:
             return PhraseResult(
@@ -402,7 +402,7 @@ class PhraseVerifier:
                 confidence=confidence,
                 reason=f"Phrase matches but confidence too low ({confidence:.2f} < {self.confidence_threshold:.2f}).",
             )
-        
+
         # ------- All checks passed -------
         return PhraseResult(
             code="OK",
@@ -426,9 +426,9 @@ _default_verifier = PhraseVerifier()
 def verify_phrase(
     expected: str,
     transcript: str,
-    confidence: Optional[float] = None,
-    audio_duration: Optional[float] = None,
-    no_speech_prob: Optional[float] = None,
+    confidence: float | None = None,
+    audio_duration: float | None = None,
+    no_speech_prob: float | None = None,
     challenge_expired: bool = False,
     challenge_timed_out: bool = False,
 ) -> PhraseResult:

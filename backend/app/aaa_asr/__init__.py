@@ -8,7 +8,7 @@ This module provides:
 Architecture: ASR transcribes. Matcher decides. Keep separate.
 """
 
-from .phrase_matcher import PhraseVerifier, PhraseResult, normalize_text
+from .phrase_matcher import PhraseResult, PhraseVerifier, normalize_text
 from .transcriber import Transcriber
 
 __all__ = ["PhraseVerifier", "PhraseResult", "normalize_text", "Transcriber"]
