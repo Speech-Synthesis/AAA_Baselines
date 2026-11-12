@@ -195,28 +195,6 @@ def exchange_token(request: TokenRequest) -> TokenResponse:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=False)
 
 def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
-    """
-    Zero-trust tenant resolution dependency.
-    
-    Extracts and returns the tenant_id directly from cryptographically validated JWT token claims.
-    
-    CRITICAL ARCHITECTURAL ENFORCEMENT:
-    Downstream API endpoints MUST inject this dependency for database queries to ensure Database
-    Row Level Security (RLS) and multi-tenant isolation are strictly respected.
-    Under NO circumstances should endpoints trust or accept tenant_id sent in client-controlled
-    POST payloads, query parameters, or route paths. Resolving tenant identity solely from the
-    validated signature guarantees defense against cross-tenant spoofing and horizontal privilege escalation.
-
-    Args:
-        token: Bearer JWT provided via HTTP Authorization header.
-
-    Returns:
-        str: The resolved, cryptographically authenticated tenant identifier.
-
-    Raises:
-        HTTPException: 401 UNAUTHORIZED if token is missing, expired, signed with wrong key,
-                       missing audience claim, or lacks tenant binding.
-    """
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -254,20 +232,36 @@ def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
     return tenant_id
 
 _RATE_LIMIT_TRACKER: Dict[str, List[float]] = {}
+_LOCKOUT_FAILURES: Dict[str, int] = {}
+_LOCKED_ENTITIES: Dict[str, float] = {}
+
 RATE_LIMIT_MAX_REQUESTS = 60
 RATE_LIMIT_WINDOW_SECONDS = 60.0
+LOCKOUT_THRESHOLD = 5
+LOCKOUT_DURATION_SECONDS = 300.0
+
+def record_auth_failure(tenant_id: str, identifier: str) -> None:
+    key = f"{tenant_id}:{identifier}"
+    failures = _LOCKOUT_FAILURES.get(key, 0) + 1
+    _LOCKOUT_FAILURES[key] = failures
+    if failures >= LOCKOUT_THRESHOLD:
+        _LOCKED_ENTITIES[key] = time.time() + LOCKOUT_DURATION_SECONDS
+
+def record_auth_success(tenant_id: str, identifier: str) -> None:
+    key = f"{tenant_id}:{identifier}"
+    _LOCKOUT_FAILURES.pop(key, None)
+    _LOCKED_ENTITIES.pop(key, None)
 
 def reset_rate_limit_state() -> None:
     _RATE_LIMIT_TRACKER.clear()
+    _LOCKOUT_FAILURES.clear()
+    _LOCKED_ENTITIES.clear()
 
 def enforce_rate_limit(
     tenant_id: str = Depends(get_current_tenant),
     client_id: Optional[str] = None,
     user_ref: Optional[str] = None,
 ) -> None:
-    """
-    Enforces request rate limits on an object level without leaking threshold data.
-    """
     identifier = user_ref or client_id or "default"
     key = f"{tenant_id}:{identifier}"
     now = time.time()
@@ -280,3 +274,21 @@ def enforce_rate_limit(
             detail="RATE_LIMITED",
         )
     _RATE_LIMIT_TRACKER[key].append(now)
+
+def enforce_lockout_policy(
+    tenant_id: str = Depends(get_current_tenant),
+    user_ref: Optional[str] = None,
+) -> None:
+    identifier = user_ref or "default"
+    key = f"{tenant_id}:{identifier}"
+    now = time.time()
+    lockout_until = _LOCKED_ENTITIES.get(key)
+    if lockout_until:
+        if now < lockout_until:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="LOCKED",
+            )
+        else:
+            _LOCKED_ENTITIES.pop(key, None)
+            _LOCKOUT_FAILURES.pop(key, None)
