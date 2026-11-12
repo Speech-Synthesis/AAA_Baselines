@@ -27,6 +27,27 @@ load_dotenv()
 
 logger = logging.getLogger("aaa_engine.security.jwt_auth")
 
+DISALLOWED_WEAK_SECRETS = frozenset([
+    "secret",
+    "changeme",
+    "test",
+    "password",
+    "admin",
+    "12345678",
+    "1234567890",
+    "aaa-engine-secret-key-change-in-production",
+    "your-secret-key-here",
+    "default",
+    "development",
+    "supersecret",
+    "jwtsecret",
+    "qwerty",
+    "letmein",
+    "root",
+    "tokensecret",
+    "keyboardcat",
+])
+
 MINIMUM_KEY_LENGTH = 32
 JWT_ALGORITHM = "HS256"
 JWT_AUDIENCE = "aaa-engine"
@@ -49,6 +70,13 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
             f"the required minimum of {MINIMUM_KEY_LENGTH} characters (256-bit entropy). "
             "Server startup aborted."
         )
+    key_lower = key_str.lower()
+    for weak_pattern in DISALLOWED_WEAK_SECRETS:
+        if weak_pattern in key_lower:
+            raise RuntimeError(
+                f"FATAL SECURITY FAILURE: 'AAA_JWT_SECRET' contains forbidden weak keyword '{weak_pattern}'. "
+                "Server startup aborted. Production keys must be randomly generated."
+            )
     unique_chars = len(set(key_str))
     if unique_chars < 6:
         raise RuntimeError(
@@ -56,3 +84,5 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
             "Server startup aborted."
         )
     return key_str
+
+JWT_SECRET: str = validate_jwt_secret()
