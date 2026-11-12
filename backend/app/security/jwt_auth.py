@@ -252,3 +252,31 @@ def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return tenant_id
+
+_RATE_LIMIT_TRACKER: Dict[str, List[float]] = {}
+RATE_LIMIT_MAX_REQUESTS = 60
+RATE_LIMIT_WINDOW_SECONDS = 60.0
+
+def reset_rate_limit_state() -> None:
+    _RATE_LIMIT_TRACKER.clear()
+
+def enforce_rate_limit(
+    tenant_id: str = Depends(get_current_tenant),
+    client_id: Optional[str] = None,
+    user_ref: Optional[str] = None,
+) -> None:
+    """
+    Enforces request rate limits on an object level without leaking threshold data.
+    """
+    identifier = user_ref or client_id or "default"
+    key = f"{tenant_id}:{identifier}"
+    now = time.time()
+    timestamps = _RATE_LIMIT_TRACKER.setdefault(key, [])
+    cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+    _RATE_LIMIT_TRACKER[key] = [ts for ts in timestamps if ts > cutoff]
+    if len(_RATE_LIMIT_TRACKER[key]) >= RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="RATE_LIMITED",
+        )
+    _RATE_LIMIT_TRACKER[key].append(now)
