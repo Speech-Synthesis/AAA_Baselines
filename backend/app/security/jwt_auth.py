@@ -195,6 +195,28 @@ def exchange_token(request: TokenRequest) -> TokenResponse:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=False)
 
 def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    """
+    Zero-trust tenant resolution dependency.
+    
+    Extracts and returns the tenant_id directly from cryptographically validated JWT token claims.
+    
+    CRITICAL ARCHITECTURAL ENFORCEMENT:
+    Downstream API endpoints MUST inject this dependency for database queries to ensure Database
+    Row Level Security (RLS) and multi-tenant isolation are strictly respected.
+    Under NO circumstances should endpoints trust or accept tenant_id sent in client-controlled
+    POST payloads, query parameters, or route paths. Resolving tenant identity solely from the
+    validated signature guarantees defense against cross-tenant spoofing and horizontal privilege escalation.
+
+    Args:
+        token: Bearer JWT provided via HTTP Authorization header.
+
+    Returns:
+        str: The resolved, cryptographically authenticated tenant identifier.
+
+    Raises:
+        HTTPException: 401 UNAUTHORIZED if token is missing, expired, signed with wrong key,
+                       missing audience claim, or lacks tenant binding.
+    """
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
