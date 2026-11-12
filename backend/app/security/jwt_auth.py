@@ -86,3 +86,26 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
     return key_str
 
 JWT_SECRET: str = validate_jwt_secret()
+
+class TokenRequest(BaseModel):
+    """Server-to-server client-credential token exchange request."""
+    client_id: str = Field(..., description="Unique host application client identifier")
+    client_secret: str = Field(..., description="Pre-shared host application secret")
+    tenant_id: str = Field(..., description="Target tenant ID for database isolation")
+
+class TokenResponse(BaseModel):
+    """Standard OAuth2 token exchange response."""
+    access_token: str = Field(..., description="Signed JWT access token binding tenant claims")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(default=TOKEN_EXPIRATION_SECONDS, description="Token lifespan in seconds (900s / 15m)")
+
+class TokenPayload(BaseModel):
+    """Decoded and verified token claims."""
+    tenant_id: str
+    client_id: str
+    sub: str
+    aud: str
+    iss: str
+    iat: int
+    exp: int
+    jti: str
