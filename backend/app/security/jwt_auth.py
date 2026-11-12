@@ -109,3 +109,41 @@ class TokenPayload(BaseModel):
     iat: int
     exp: int
     jti: str
+
+_MOCK_API_CLIENTS: Dict[str, Dict[str, Any]] = {
+    "banking-shield-core": {
+        "secret_hash": hashlib.sha256("banking-shield-super-secure-production-secret-2026".encode()).hexdigest(),
+        "allowed_tenants": ["bank-alpha-001", "bank-beta-002", "tenant-test-default"],
+    },
+    "callguard-agent": {
+        "secret_hash": hashlib.sha256("callguard-telecom-perimeter-secret-key-9988".encode()).hexdigest(),
+        "allowed_tenants": ["telco-omega-99", "tenant-test-default"],
+    },
+    "test-client-id": {
+        "secret_hash": hashlib.sha256("test-client-secret-key-32-characters-long!!".encode()).hexdigest(),
+        "allowed_tenants": ["tenant-test-default", "tenant-alpha"],
+    },
+}
+
+def register_mock_api_client(client_id: str, client_secret: str, allowed_tenants: List[str]) -> None:
+    """Helper to dynamically register API clients for automated integration tests."""
+    _MOCK_API_CLIENTS[client_id] = {
+        "secret_hash": hashlib.sha256(client_secret.encode()).hexdigest(),
+        "allowed_tenants": allowed_tenants,
+    }
+
+def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str) -> bool:
+    """
+    Verifies server-to-server client credentials using constant-time hash comparison.
+    Timing-attack resistant comparison (hmac.compare_digest) is enforced.
+    """
+    client_record = _MOCK_API_CLIENTS.get(client_id)
+    if not client_record:
+        dummy_hash = hashlib.sha256(b"dummy").hexdigest()
+        hmac.compare_digest(dummy_hash, dummy_hash)
+        return False
+    computed_hash = hashlib.sha256(client_secret.encode()).hexdigest()
+    is_secret_valid = hmac.compare_digest(client_record["secret_hash"], computed_hash)
+    allowed_tenants = client_record.get("allowed_tenants", [])
+    is_tenant_valid = tenant_id in allowed_tenants or "*" in allowed_tenants
+    return is_secret_valid and is_tenant_valid
