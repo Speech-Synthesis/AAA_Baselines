@@ -88,19 +88,16 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
 JWT_SECRET: str = validate_jwt_secret()
 
 class TokenRequest(BaseModel):
-    """Server-to-server client-credential token exchange request."""
     client_id: str = Field(..., description="Unique host application client identifier")
     client_secret: str = Field(..., description="Pre-shared host application secret")
     tenant_id: str = Field(..., description="Target tenant ID for database isolation")
 
 class TokenResponse(BaseModel):
-    """Standard OAuth2 token exchange response."""
     access_token: str = Field(..., description="Signed JWT access token binding tenant claims")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(default=TOKEN_EXPIRATION_SECONDS, description="Token lifespan in seconds (900s / 15m)")
 
 class TokenPayload(BaseModel):
-    """Decoded and verified token claims."""
     tenant_id: str
     client_id: str
     sub: str
@@ -144,9 +141,6 @@ def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str
     return is_secret_valid and is_tenant_valid
 
 def create_tenant_token(tenant_id: str, client_id: str, expires_in_seconds: int = TOKEN_EXPIRATION_SECONDS) -> str:
-    """
-    Issues a cryptographically signed JWT binding tenant_id to the token payload.
-    """
     now = int(time.time())
     payload = {
         "sub": tenant_id,
@@ -159,3 +153,41 @@ def create_tenant_token(tenant_id: str, client_id: str, expires_in_seconds: int 
         "jti": str(uuid.uuid4()),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+router = APIRouter(tags=["auth"])
+
+@router.post(
+    "/v1/auth/token",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Client-Credential Token Exchange",
+    description="Exchanges host application client credentials for a tenant-scoped 15-minute JWT."
+)
+@router.post(
+    "/token",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False
+)
+def exchange_token(request: TokenRequest) -> TokenResponse:
+    is_authenticated = verify_client_credentials(
+        client_id=request.client_id,
+        client_secret=request.client_secret,
+        tenant_id=request.tenant_id,
+    )
+    if not is_authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="INVALID_CLIENT_CREDENTIALS",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_tenant_token(
+        tenant_id=request.tenant_id,
+        client_id=request.client_id,
+        expires_in_seconds=TOKEN_EXPIRATION_SECONDS,
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=TOKEN_EXPIRATION_SECONDS,
+    )
