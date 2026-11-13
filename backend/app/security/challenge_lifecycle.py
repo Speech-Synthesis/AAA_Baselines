@@ -58,3 +58,25 @@ VALID_TRANSITIONS: Dict[ChallengeState, List[ChallengeState]] = {
 def can_transition(current_state: ChallengeState, new_state: ChallengeState) -> bool:
     """Verifies whether transition from current_state to new_state is permissible."""
     return new_state in VALID_TRANSITIONS.get(current_state, [])
+
+
+def generate_challenge_token(
+    user_id: str,
+    phrase: str,
+    secret_key: Optional[bytes] = None,
+    ttl_seconds: int = CHALLENGE_TTL_SECONDS,
+) -> Tuple[str, int]:
+    """
+    Generates a cryptographically signed, unguessable challenge token.
+    Token format: {nonce}.{expires_timestamp}.{signature}
+    """
+    secret = secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    now_ts = int(time.time())
+    expires_ts = now_ts + ttl_seconds
+    nonce = secrets.token_hex(16)  # 32 hex characters
+
+    payload = f"{user_id}:{expires_ts}:{phrase}:{nonce}"
+    signature = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    token = f"{nonce}.{expires_ts}.{signature}"
+
+    return token, expires_ts
