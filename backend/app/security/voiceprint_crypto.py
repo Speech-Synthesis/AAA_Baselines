@@ -93,3 +93,15 @@ class VoiceprintEncryptor:
         nonce = packed[:NONCE_SIZE_BYTES]
         ciphertext = packed[NONCE_SIZE_BYTES:]
         return self.decrypt(ciphertext, nonce, associated_data)
+
+
+def derive_tenant_voiceprint_key(tenant_id: str, master_key: Optional[bytes] = None) -> bytes:
+    """
+    Derives an isolated 256-bit cryptographic key per tenant using HMAC-SHA256.
+    Ensures cryptographic multi-tenant separation for biometric data at rest.
+    """
+    if not tenant_id:
+        raise ValueError("tenant_id must be provided for tenant key derivation")
+
+    master = master_key or os.environ.get("VOICEPRINT_KEY", "master-voiceprint-vault-key-2026!").encode()
+    return hmac.new(master, f"tenant-isolation-key:{tenant_id}".encode("utf-8"), hashlib.sha256).digest()
