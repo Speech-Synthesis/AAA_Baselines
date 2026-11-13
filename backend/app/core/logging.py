@@ -8,21 +8,29 @@ Role: Security & Perimeter Defense Engineer
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Any
+from datetime import UTC, datetime
+from typing import Any
 
-SENSITIVE_FIELDS = frozenset([
-    "embedding", "audio", "audio_bytes", "client_secret",
-    "password", "secret", "private_key", "token"
-])
+SENSITIVE_FIELDS = frozenset(
+    [
+        "embedding",
+        "audio",
+        "audio_bytes",
+        "client_secret",
+        "password",
+        "secret",
+        "private_key",
+        "token",
+    ]
+)
 
 
 class StructuredSecurityFormatter(logging.Formatter):
     """JSON log formatter adhering to AAA Security Boundaries."""
 
     def format(self, record: logging.LogRecord) -> str:
-        log_entry: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+        log_entry: dict[str, Any] = {
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

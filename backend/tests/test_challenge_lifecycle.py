@@ -5,16 +5,17 @@ Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 
 import time
 import unittest
+
 from app.security.challenge_lifecycle import (
+    ChallengeLifecycleError,
     ChallengeState,
     can_transition,
     generate_challenge_token,
     issue_capture_grant,
-    verify_capture_grant,
     validate_and_consume_challenge,
-    ChallengeLifecycleError,
-    InvalidStateTransitionError,
+    verify_capture_grant,
 )
+
 
 class TestChallengeLifecycle(unittest.TestCase):
     def setUp(self):
@@ -30,7 +31,9 @@ class TestChallengeLifecycle(unittest.TestCase):
         self.assertFalse(can_transition(ChallengeState.CONSUMED, ChallengeState.AUTHORIZED))
 
     def test_generate_and_consume_token_success(self):
-        token, exp_ts = generate_challenge_token("user-01", "blue falcon seven", self.secret, ttl_seconds=90)
+        token, exp_ts = generate_challenge_token(
+            "user-01", "blue falcon seven", self.secret, ttl_seconds=90
+        )
         self.assertEqual(len(token.split(".")), 3)
 
         new_state, meta = validate_and_consume_challenge(
@@ -45,7 +48,9 @@ class TestChallengeLifecycle(unittest.TestCase):
         self.assertEqual(meta["user_id"], "user-01")
 
     def test_replay_attack_prevention(self):
-        token, exp_ts = generate_challenge_token("user-01", "blue falcon seven", self.secret, ttl_seconds=90)
+        token, exp_ts = generate_challenge_token(
+            "user-01", "blue falcon seven", self.secret, ttl_seconds=90
+        )
         with self.assertRaises(ChallengeLifecycleError) as ctx:
             validate_and_consume_challenge(
                 token=token,
@@ -58,7 +63,9 @@ class TestChallengeLifecycle(unittest.TestCase):
         self.assertIn("TOKEN_ALREADY_USED", str(ctx.exception))
 
     def test_tampered_signature_rejection(self):
-        token, exp_ts = generate_challenge_token("user-01", "blue falcon seven", self.secret, ttl_seconds=90)
+        token, exp_ts = generate_challenge_token(
+            "user-01", "blue falcon seven", self.secret, ttl_seconds=90
+        )
         tampered_token = token[:-4] + "dead"
         with self.assertRaises(ChallengeLifecycleError) as ctx:
             validate_and_consume_challenge(
@@ -80,6 +87,7 @@ class TestChallengeLifecycle(unittest.TestCase):
 
         with self.assertRaises(ChallengeLifecycleError):
             verify_capture_grant(grant, "wrong-chal-id", self.jwt_secret)
+
 
 if __name__ == "__main__":
     unittest.main()

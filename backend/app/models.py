@@ -3,10 +3,21 @@ ORM Models - Navadeep
 Database-agnostic models supporting both SQLite and PostgreSQL
 """
 
-import uuid
 import json
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Integer, Float, Boolean, DateTime, ForeignKey, TypeDecorator
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+)
 from sqlalchemy.orm import relationship
 
 from .db import Base
@@ -16,6 +27,7 @@ class GUID(TypeDecorator):
     """Platform-independent GUID type.
     Uses String(36) for SQLite and native UUID for PostgreSQL.
     """
+
     impl = String(36)
     cache_ok = True
 
@@ -34,6 +46,7 @@ class JSONEncodedList(TypeDecorator):
     """Stores a list as a JSON-encoded string.
     Works with both SQLite and PostgreSQL.
     """
+
     impl = Text
     cache_ok = True
 

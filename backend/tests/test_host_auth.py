@@ -5,14 +5,16 @@ Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 
 import time
 import unittest
-import uuid
+
 from jose import jwt
+
 from app.schemas.common import Decision
 from app.security.host_auth import (
-    HostAppAuthenticator,
     BankingShieldPolicy,
+    HostAppAuthenticator,
     evaluate_banking_decision,
 )
+
 
 class TestHostAuthBanking(unittest.TestCase):
     def setUp(self):
@@ -50,10 +52,11 @@ class TestHostAuthBanking(unittest.TestCase):
         token = jwt.encode(
             {"sub": "bank-shield-01", "aud": "aaa-engine", "exp": int(time.time()) + 60},
             self.secret,
-            algorithm="HS256"
+            algorithm="HS256",
         )
         claims = self.authenticator.validate_host_token(token)
         self.assertEqual(claims["sub"], "bank-shield-01")
+
 
 if __name__ == "__main__":
     unittest.main()

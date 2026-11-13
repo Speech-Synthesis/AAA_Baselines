@@ -6,17 +6,15 @@ Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 Role: Security & Perimeter Defense Engineer
 """
 
-import os
-import time
-import uuid
-import hmac
 import hashlib
+import hmac
+import os
 import secrets
+import time
 from enum import Enum
-from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime, timezone
+from typing import Any
 
-from jose import jwt, JWTError, ExpiredSignatureError
+from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWTClaimsError
 
 CHALLENGE_TTL_SECONDS = 90
@@ -25,6 +23,7 @@ CAPTURE_GRANT_AUDIENCE = "aaa-capture"
 
 class ChallengeState(str, Enum):
     """Lifecycle states of an acoustic authentication challenge."""
+
     CREATED = "CREATED"
     AUTHORIZED = "AUTHORIZED"
     CAPTURE_RECEIVED = "CAPTURE_RECEIVED"
@@ -36,18 +35,32 @@ class ChallengeState(str, Enum):
 
 class ChallengeLifecycleError(Exception):
     """Base exception for challenge lifecycle failures."""
+
     pass
 
 
 class InvalidStateTransitionError(ChallengeLifecycleError):
     """Raised when an invalid state transition is attempted."""
+
     pass
 
 
-VALID_TRANSITIONS: Dict[ChallengeState, List[ChallengeState]] = {
-    ChallengeState.CREATED: [ChallengeState.AUTHORIZED, ChallengeState.EXPIRED, ChallengeState.TERMINATED],
-    ChallengeState.AUTHORIZED: [ChallengeState.CAPTURE_RECEIVED, ChallengeState.EXPIRED, ChallengeState.TERMINATED],
-    ChallengeState.CAPTURE_RECEIVED: [ChallengeState.CONSUMED, ChallengeState.EXPIRED, ChallengeState.TERMINATED],
+VALID_TRANSITIONS: dict[ChallengeState, list[ChallengeState]] = {
+    ChallengeState.CREATED: [
+        ChallengeState.AUTHORIZED,
+        ChallengeState.EXPIRED,
+        ChallengeState.TERMINATED,
+    ],
+    ChallengeState.AUTHORIZED: [
+        ChallengeState.CAPTURE_RECEIVED,
+        ChallengeState.EXPIRED,
+        ChallengeState.TERMINATED,
+    ],
+    ChallengeState.CAPTURE_RECEIVED: [
+        ChallengeState.CONSUMED,
+        ChallengeState.EXPIRED,
+        ChallengeState.TERMINATED,
+    ],
     ChallengeState.CONSUMED: [ChallengeState.COMPLETED, ChallengeState.TERMINATED],
     ChallengeState.EXPIRED: [ChallengeState.TERMINATED],
     ChallengeState.COMPLETED: [],
@@ -63,14 +76,16 @@ def can_transition(current_state: ChallengeState, new_state: ChallengeState) -> 
 def generate_challenge_token(
     user_id: str,
     phrase: str,
-    secret_key: Optional[bytes] = None,
+    secret_key: bytes | None = None,
     ttl_seconds: int = CHALLENGE_TTL_SECONDS,
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     """
     Generates a cryptographically signed, unguessable challenge token.
     Token format: {nonce}.{expires_timestamp}.{signature}
     """
-    secret = secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    secret = (
+        secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    )
     now_ts = int(time.time())
     expires_ts = now_ts + ttl_seconds
     nonce = secrets.token_hex(16)  # 32 hex characters
@@ -86,13 +101,15 @@ def issue_capture_grant(
     challenge_id: str,
     tenant_id: str,
     expires_at_ts: int,
-    jwt_secret: Optional[str] = None,
+    jwt_secret: str | None = None,
 ) -> str:
     """
     Issues a short-lived capture grant JWT authorizing single audio upload.
     Binds challenge_id as subject and 'aaa-capture' as audience.
     """
-    secret = jwt_secret or os.environ.get("AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!")
+    secret = jwt_secret or os.environ.get(
+        "AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!"
+    )
     now_ts = int(time.time())
     payload = {
         "sub": str(challenge_id),
@@ -108,12 +125,14 @@ def issue_capture_grant(
 def verify_capture_grant(
     grant_token: str,
     expected_challenge_id: str,
-    jwt_secret: Optional[str] = None,
-) -> Dict[str, Any]:
+    jwt_secret: str | None = None,
+) -> dict[str, Any]:
     """
     Validates a capture grant token against challenge and audience restrictions.
     """
-    secret = jwt_secret or os.environ.get("AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!")
+    secret = jwt_secret or os.environ.get(
+        "AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!"
+    )
     try:
         claims = jwt.decode(
             grant_token,
@@ -121,10 +140,10 @@ def verify_capture_grant(
             algorithms=["HS256"],
             audience=CAPTURE_GRANT_AUDIENCE,
         )
-    except ExpiredSignatureError:
-        raise ChallengeLifecycleError("CAPTURE_GRANT_EXPIRED")
-    except (JWTClaimsError, JWTError):
-        raise ChallengeLifecycleError("INVALID_CAPTURE_GRANT")
+    except ExpiredSignatureError as err:
+        raise ChallengeLifecycleError("CAPTURE_GRANT_EXPIRED") from err
+    except (JWTClaimsError, JWTError) as err:
+        raise ChallengeLifecycleError("INVALID_CAPTURE_GRANT") from err
 
     if claims.get("sub") != str(expected_challenge_id):
         raise ChallengeLifecycleError("CAPTURE_GRANT_CHALLENGE_MISMATCH")
@@ -138,8 +157,8 @@ def validate_and_consume_challenge(
     stored_phrase: str,
     current_state: ChallengeState,
     expires_at_ts: int,
-    secret_key: Optional[bytes] = None,
-) -> Tuple[ChallengeState, Dict[str, Any]]:
+    secret_key: bytes | None = None,
+) -> tuple[ChallengeState, dict[str, Any]]:
     """
     Atomically validates HMAC signature, expiration, and enforces single-use semantics.
     Transitions state to CONSUMED upon success.
@@ -165,14 +184,16 @@ def validate_and_consume_challenge(
     nonce, exp_str, signature = parts
     try:
         token_exp = int(exp_str)
-    except ValueError:
-        raise ChallengeLifecycleError("INVALID_TOKEN_EXPIRATION")
+    except ValueError as err:
+        raise ChallengeLifecycleError("INVALID_TOKEN_EXPIRATION") from err
 
     if now_ts > token_exp:
         raise ChallengeLifecycleError("TOKEN_EXPIRED")
 
     # 4. Constant-Time HMAC Signature Verification
-    secret = secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    secret = (
+        secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    )
     expected_payload = f"{stored_user_id}:{exp_str}:{stored_phrase}:{nonce}"
     expected_sig = hmac.new(secret, expected_payload.encode("utf-8"), hashlib.sha256).hexdigest()
 

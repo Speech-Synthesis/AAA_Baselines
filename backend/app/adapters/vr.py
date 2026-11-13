@@ -7,42 +7,72 @@ Role: Security & Perimeter Defense Engineer
 """
 
 import re
-from datetime import datetime, timezone
-from typing import List, Tuple, Dict, Any
+from datetime import UTC, datetime
 
-from .base import ModelAdapter, ModelInfo
 from ..schemas.risk import (
-    RiskLevel,
     RiskAction,
     RiskIndicator,
+    RiskLevel,
     TranscriptRiskRequest,
     TranscriptRiskResponse,
 )
+from .base import ModelAdapter, ModelInfo
 
-PATTERNS: Dict[RiskIndicator, List[str]] = {
+PATTERNS: dict[RiskIndicator, list[str]] = {
     RiskIndicator.URGENT_TRANSFER_REQUEST: [
-        r"urgent(ly)?", r"immediately", r"right now", r"emergency wire",
-        r"transfer.*immediately", r"rush.*transfer", r"asap", r"deadline"
+        r"urgent(ly)?",
+        r"immediately",
+        r"right now",
+        r"emergency wire",
+        r"transfer.*immediately",
+        r"rush.*transfer",
+        r"asap",
+        r"deadline",
     ],
     RiskIndicator.PRESSURE_TACTICS_DETECTED: [
-        r"arrest", r"police", r"law enforcement", r"legal action",
-        r"warrant", r"suspended", r"lawsuit", r"penalty", r"jail"
+        r"arrest",
+        r"police",
+        r"law enforcement",
+        r"legal action",
+        r"warrant",
+        r"suspended",
+        r"lawsuit",
+        r"penalty",
+        r"jail",
     ],
     RiskIndicator.ACCOUNT_NUMBER_MENTIONED: [
-        r"account.*ending.*in", r"routing.*number", r"wire.*to",
-        r"\d{4}[ -]?\d{4}[ -]?\d{4}", r"iban", r"swift code"
+        r"account.*ending.*in",
+        r"routing.*number",
+        r"wire.*to",
+        r"\d{4}[ -]?\d{4}[ -]?\d{4}",
+        r"iban",
+        r"swift code",
     ],
     RiskIndicator.CREDENTIAL_HARVESTING_ATTEMPT: [
-        r"otp", r"one[- ]time password", r"security code", r"pin number",
-        r"password", r"cvv", r"social security", r"ssn"
+        r"otp",
+        r"one[- ]time password",
+        r"security code",
+        r"pin number",
+        r"password",
+        r"cvv",
+        r"social security",
+        r"ssn",
     ],
     RiskIndicator.UNVERIFIED_BENEFICIARY: [
-        r"new account", r"unlisted beneficiary", r"third[- ]party account",
-        r"bitcoin", r"crypto", r"gift card"
+        r"new account",
+        r"unlisted beneficiary",
+        r"third[- ]party account",
+        r"bitcoin",
+        r"crypto",
+        r"gift card",
     ],
     RiskIndicator.IMPERSONATION_ATTEMPT: [
-        r"fraud department", r"security team", r"internal affairs",
-        r"federal agent", r"bank manager", r"irs agent"
+        r"fraud department",
+        r"security team",
+        r"internal affairs",
+        r"federal agent",
+        r"bank manager",
+        r"irs agent",
     ],
 }
 
@@ -72,10 +102,10 @@ class TranscriptRiskAdapter(ModelAdapter):
     def unload(self) -> None:
         self._is_loaded = False
 
-    def analyze_transcript(self, transcript: str) -> Tuple[RiskLevel, List[str], str, float]:
+    def analyze_transcript(self, transcript: str) -> tuple[RiskLevel, list[str], str, float]:
         """Analyzes transcript against approved indicator rules."""
         text = transcript.lower()
-        detected: List[str] = []
+        detected: list[str] = []
 
         for indicator, regex_list in PATTERNS.items():
             for pattern in regex_list:
@@ -106,5 +136,5 @@ class TranscriptRiskAdapter(ModelAdapter):
             recommended_action=action,
             confidence=confidence,
             model_version=self._model_version,
-            analyzed_at=datetime.now(timezone.utc).isoformat(),
+            analyzed_at=datetime.now(UTC).isoformat(),
         )

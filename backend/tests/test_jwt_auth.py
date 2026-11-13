@@ -3,31 +3,29 @@ Unit and Integration Tests for AAA Engine Security & JWT Authentication
 Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 """
 
-import time
 import os
 import unittest
-from fastapi import FastAPI, Depends, HTTPException, status
+
+from fastapi import FastAPI, HTTPException, status
 from jose import jwt
 
 from app.security.jwt_auth import (
-    validate_jwt_secret,
-    verify_client_credentials,
-    create_tenant_token,
-    get_current_tenant,
-    enforce_rate_limit,
-    enforce_lockout_policy,
-    record_auth_failure,
-    record_auth_success,
-    reset_rate_limit_state,
-    configure_cors,
-    register_mock_api_client,
-    exchange_token,
-    TokenRequest,
-    JWT_SECRET,
     JWT_ALGORITHM,
     JWT_AUDIENCE,
-    TOKEN_EXPIRATION_SECONDS,
+    JWT_SECRET,
+    TokenRequest,
+    configure_cors,
+    create_tenant_token,
+    enforce_lockout_policy,
+    enforce_rate_limit,
+    exchange_token,
+    get_current_tenant,
+    record_auth_failure,
+    reset_rate_limit_state,
+    validate_jwt_secret,
+    verify_client_credentials,
 )
+
 
 class TestSecurityJWTAuth(unittest.TestCase):
     def setUp(self):
@@ -61,16 +59,20 @@ class TestSecurityJWTAuth(unittest.TestCase):
                 self.assertIn("FATAL SECURITY FAILURE", str(ctx.exception))
 
     def test_verify_client_credentials(self):
-        self.assertTrue(verify_client_credentials(
-            client_id="banking-shield-core",
-            client_secret="banking-shield-super-secure-production-secret-2026",
-            tenant_id="bank-alpha-001",
-        ))
-        self.assertFalse(verify_client_credentials(
-            client_id="banking-shield-core",
-            client_secret="wrong-secret",
-            tenant_id="bank-alpha-001",
-        ))
+        self.assertTrue(
+            verify_client_credentials(
+                client_id="banking-shield-core",
+                client_secret="banking-shield-super-secure-production-secret-2026",
+                tenant_id="bank-alpha-001",
+            )
+        )
+        self.assertFalse(
+            verify_client_credentials(
+                client_id="banking-shield-core",
+                client_secret="wrong-secret",
+                tenant_id="bank-alpha-001",
+            )
+        )
 
     def test_token_exchange_success(self):
         req = TokenRequest(
@@ -131,6 +133,7 @@ class TestSecurityJWTAuth(unittest.TestCase):
             os.environ["ALLOWED_ORIGINS"] = "https://bank.com,*,https://app.io"
             configure_cors(test_app)
             from fastapi.middleware.cors import CORSMiddleware
+
             cors_mw = next(m for m in test_app.user_middleware if m.cls == CORSMiddleware)
             self.assertEqual(cors_mw.options["allow_origins"], [])
         finally:
@@ -144,11 +147,15 @@ class TestSecurityJWTAuth(unittest.TestCase):
             os.environ["ALLOWED_ORIGINS"] = "https://bank.com, https://app.io"
             configure_cors(test_app)
             from fastapi.middleware.cors import CORSMiddleware
+
             cors_mw = next(m for m in test_app.user_middleware if m.cls == CORSMiddleware)
-            self.assertEqual(cors_mw.options["allow_origins"], ["https://bank.com", "https://app.io"])
+            self.assertEqual(
+                cors_mw.options["allow_origins"], ["https://bank.com", "https://app.io"]
+            )
         finally:
             if orig_env is not None:
                 os.environ["ALLOWED_ORIGINS"] = orig_env
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,14 +4,16 @@ Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 """
 
 import unittest
-from app.schemas.risk import (
-    RiskLevel,
-    RiskAction,
-    RiskIndicator,
-    TranscriptRiskRequest,
-)
+
 from app.adapters.vr import TranscriptRiskAdapter
 from app.api.v1.risk import evaluate_transcript_risk
+from app.schemas.risk import (
+    RiskAction,
+    RiskIndicator,
+    RiskLevel,
+    TranscriptRiskRequest,
+)
+
 
 class TestAAAVRRiskAnalysis(unittest.TestCase):
     def setUp(self):
@@ -63,6 +65,7 @@ class TestAAAVRRiskAnalysis(unittest.TestCase):
         self.assertEqual(res.request_id, "custom-req-id-777")
         self.assertEqual(res.session_id, "call-004")
         self.assertIn(res.risk_level, [RiskLevel.HIGH, RiskLevel.CRITICAL])
+
 
 if __name__ == "__main__":
     unittest.main()

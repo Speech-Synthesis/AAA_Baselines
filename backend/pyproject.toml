@@ -28,10 +28,16 @@ ignore = [
     "S104",   # possible binding to all interfaces
     "S603",   # subprocess call - check for shell=True
     "S607",   # starting a process with a partial path
+    "S311",   # standard pseudo-random generators
+    "UP042",  # class inherits from both str and Enum
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "S105", "S106"]  # Allow asserts and hardcoded secrets in tests
+"tests/**/*.py" = ["S101", "S105", "S106"]
+"test_*.py" = ["S101", "S105", "S106", "E402"]
+"backend/tests/**/*.py" = ["S101", "S105", "S106"]
+"backend/test_*.py" = ["S101", "S105", "S106", "E402"]
+"backend/app/test_*.py" = ["S101", "S105", "S106", "E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

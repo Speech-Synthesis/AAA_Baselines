@@ -3,15 +3,17 @@ AAA Engine Common Schemas
 Shared Pydantic models for API requests and responses.
 """
 
+import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any
+
 from pydantic import BaseModel, Field
-import uuid
 
 
 class Decision(str, Enum):
     """Authentication decision outcomes."""
+
     APPROVE = "APPROVE"
     DENY = "DENY"
     STEP_UP = "STEP_UP"
@@ -21,6 +23,7 @@ class Decision(str, Enum):
 
 class RiskLevel(str, Enum):
     """Risk assessment levels."""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -29,6 +32,7 @@ class RiskLevel(str, Enum):
 
 class ModelStatus(str, Enum):
     """Model availability status."""
+
     OK = "ok"
     LOADING = "loading"
     ERROR = "error"
@@ -37,6 +41,7 @@ class ModelStatus(str, Enum):
 
 class CheckStatus(str, Enum):
     """Readiness check status."""
+
     OK = "ok"
     ERROR = "error"
 
@@ -44,12 +49,14 @@ class CheckStatus(str, Enum):
 # Health Check Schemas
 class HealthResponse(BaseModel):
     """Response for /v1/health endpoint."""
+
     status: str = "healthy"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ModelChecks(BaseModel):
     """Model availability checks."""
+
     speaker_verification: ModelStatus = ModelStatus.UNAVAILABLE
     deepfake_detection: ModelStatus = ModelStatus.UNAVAILABLE
     asr: ModelStatus = ModelStatus.UNAVAILABLE
@@ -57,6 +64,7 @@ class ModelChecks(BaseModel):
 
 class ReadinessChecks(BaseModel):
     """All readiness checks."""
+
     database: CheckStatus = CheckStatus.ERROR
     models: ModelChecks = Field(default_factory=ModelChecks)
     configuration: CheckStatus = CheckStatus.ERROR
@@ -64,6 +72,7 @@ class ReadinessChecks(BaseModel):
 
 class ReadinessResponse(BaseModel):
     """Response for /v1/ready endpoint."""
+
     status: str = "not_ready"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     checks: ReadinessChecks = Field(default_factory=ReadinessChecks)
@@ -72,18 +81,21 @@ class ReadinessResponse(BaseModel):
 # Error Schemas
 class ErrorResponse(BaseModel):
     """Standard error response."""
+
     error: str
     message: str
-    request_id: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    request_id: str | None = None
+    details: dict[str, Any] | None = None
 
 
 # Common Request/Response Fields
 class RequestIdMixin(BaseModel):
     """Mixin for request ID tracking."""
+
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class TimestampMixin(BaseModel):
     """Mixin for timestamp fields."""
+
     created_at: datetime = Field(default_factory=datetime.utcnow)

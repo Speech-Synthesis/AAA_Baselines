@@ -5,12 +5,12 @@ Abstract interfaces for model integration.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class ModelInfo:
     """Model metadata."""
+
     name: str
     version: str
     model_id: str
@@ -20,14 +20,16 @@ class ModelInfo:
 @dataclass
 class SpeakerResult:
     """Result from speaker verification."""
+
     embedding: list[float]
-    score: Optional[float] = None  # Similarity score if comparing
+    score: float | None = None  # Similarity score if comparing
     is_match: bool = False
 
 
 @dataclass
 class DeepfakeResult:
     """Result from deepfake detection."""
+
     label: str  # "bonafide" or "spoof"
     confidence: float  # 0.0 to 1.0
     is_spoof: bool
@@ -36,9 +38,10 @@ class DeepfakeResult:
 @dataclass
 class ASRResult:
     """Result from speech recognition."""
+
     transcript: str
     confidence: float
-    similarity: Optional[float] = None  # If comparing to expected phrase
+    similarity: float | None = None  # If comparing to expected phrase
 
 
 class ModelAdapter(ABC):
@@ -88,11 +91,7 @@ class SpeakerVerificationAdapter(ModelAdapter):
         pass
 
     @abstractmethod
-    def compare_embeddings(
-        self,
-        embedding1: list[float],
-        embedding2: list[float]
-    ) -> float:
+    def compare_embeddings(self, embedding1: list[float], embedding2: list[float]) -> float:
         """
         Compare two embeddings and return similarity score.
 
@@ -106,10 +105,7 @@ class SpeakerVerificationAdapter(ModelAdapter):
         pass
 
     def verify_speaker(
-        self,
-        audio_bytes: bytes,
-        enrolled_embedding: list[float],
-        threshold: float = 0.5
+        self, audio_bytes: bytes, enrolled_embedding: list[float], threshold: float = 0.5
     ) -> SpeakerResult:
         """
         Verify if audio matches enrolled speaker.
@@ -124,11 +120,7 @@ class SpeakerVerificationAdapter(ModelAdapter):
         """
         result = self.extract_embedding(audio_bytes)
         score = self.compare_embeddings(result.embedding, enrolled_embedding)
-        return SpeakerResult(
-            embedding=result.embedding,
-            score=score,
-            is_match=score >= threshold
-        )
+        return SpeakerResult(embedding=result.embedding, score=score, is_match=score >= threshold)
 
 
 class DeepfakeDetectionAdapter(ModelAdapter):
@@ -190,11 +182,7 @@ class ASRAdapter(ModelAdapter):
         pass
 
     @abstractmethod
-    def compare_phrases(
-        self,
-        transcript: str,
-        expected: str
-    ) -> float:
+    def compare_phrases(self, transcript: str, expected: str) -> float:
         """
         Compare transcript to expected phrase.
 
@@ -208,10 +196,7 @@ class ASRAdapter(ModelAdapter):
         pass
 
     def verify_phrase(
-        self,
-        audio_bytes: bytes,
-        expected_phrase: str,
-        threshold: float = 0.6
+        self, audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
     ) -> ASRResult:
         """
         Verify if audio contains expected phrase.
@@ -227,7 +212,5 @@ class ASRAdapter(ModelAdapter):
         result = self.transcribe(audio_bytes)
         similarity = self.compare_phrases(result.transcript, expected_phrase)
         return ASRResult(
-            transcript=result.transcript,
-            confidence=result.confidence,
-            similarity=similarity
+            transcript=result.transcript, confidence=result.confidence, similarity=similarity
         )

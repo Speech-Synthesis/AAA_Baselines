@@ -7,25 +7,27 @@ Role: Security & Perimeter Defense Engineer
 """
 
 import os
-import time
 from enum import Enum
-from typing import Optional, Dict, Any, List, Tuple
-from jose import jwt, JWTError, ExpiredSignatureError
-from fastapi import HTTPException, status, Request
-from pydantic import BaseModel, Field
+from typing import Any
+
+from fastapi import HTTPException, status
+from jose import ExpiredSignatureError, JWTError, jwt
+from pydantic import BaseModel
 
 from ..schemas.common import Decision
 
 
 class BankingShieldPolicy(str, Enum):
     """Risk tiers for financial transactions."""
-    STANDARD = "STANDARD"       # Under $1,000
-    ELEVATED = "ELEVATED"       # $1,000 - $10,000
-    HIGH_VALUE = "HIGH_VALUE"   # Over $10,000 / International
+
+    STANDARD = "STANDARD"  # Under $1,000
+    ELEVATED = "ELEVATED"  # $1,000 - $10,000
+    HIGH_VALUE = "HIGH_VALUE"  # Over $10,000 / International
 
 
 class TransactionAuthRequest(BaseModel):
     """Transaction authorization request from Banking Shield."""
+
     transaction_id: str
     user_id: str
     amount: float
@@ -37,6 +39,7 @@ class TransactionAuthRequest(BaseModel):
 
 class TransactionAuthResponse(BaseModel):
     """Decision outcome without biometric score leakage."""
+
     transaction_id: str
     decision: Decision
     requires_step_up: bool
@@ -47,11 +50,13 @@ class TransactionAuthResponse(BaseModel):
 class HostAppAuthenticator:
     """Validates host application authorization tokens (Banking Shield / CallGuard)."""
 
-    def __init__(self, secret_or_key: Optional[str] = None, expected_issuer: str = "aaa-auth-service"):
-        self.secret = secret_or_key or os.environ.get("AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!")
+    def __init__(self, secret_or_key: str | None = None, expected_issuer: str = "aaa-auth-service"):
+        self.secret = secret_or_key or os.environ.get(
+            "AAA_JWT_SECRET", "default-fallback-key-32-characters-min!!"
+        )
         self.expected_issuer = expected_issuer
 
-    def validate_host_token(self, token: str, required_scope: Optional[str] = None) -> Dict[str, Any]:
+    def validate_host_token(self, token: str, required_scope: str | None = None) -> dict[str, Any]:
         try:
             claims = jwt.decode(
                 token,
@@ -59,10 +64,14 @@ class HostAppAuthenticator:
                 algorithms=["HS256", "RS256"],
                 audience="aaa-engine",
             )
-        except ExpiredSignatureError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="HOST_TOKEN_EXPIRED")
-        except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="INVALID_HOST_TOKEN")
+        except ExpiredSignatureError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="HOST_TOKEN_EXPIRED"
+            ) from e
+        except JWTError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="INVALID_HOST_TOKEN"
+            ) from e
 
         if required_scope and required_scope not in claims.get("scope", "").split():
             # If scopes are defined, enforce them
@@ -76,7 +85,7 @@ def evaluate_banking_decision(
     is_spoof: bool,
     policy_tier: BankingShieldPolicy = BankingShieldPolicy.STANDARD,
     spoof_confidence: float = 0.0,
-) -> Tuple[Decision, bool]:
+) -> tuple[Decision, bool]:
     """
     Evaluates acoustic outputs against Banking Shield policy.
     Ensures raw scores are NEVER leaked; returns only high-level Decision.

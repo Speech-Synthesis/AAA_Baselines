@@ -3,19 +3,20 @@ AAA Engine Health and Readiness Endpoints
 """
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, Response
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from ...core.config import validate_production_config
 from ...db import get_db
-from ...core.config import get_settings, validate_production_config
 from ...schemas.common import (
+    CheckStatus,
     HealthResponse,
-    ReadinessResponse,
-    ReadinessChecks,
     ModelChecks,
     ModelStatus,
-    CheckStatus,
+    ReadinessChecks,
+    ReadinessResponse,
 )
 
 router = APIRouter()
@@ -29,17 +30,11 @@ async def health_check():
     Returns 200 if the process is alive.
     Does not check dependencies.
     """
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.utcnow()
-    )
+    return HealthResponse(status="healthy", timestamp=datetime.utcnow())
 
 
 @router.get("/ready", response_model=ReadinessResponse)
-async def readiness_check(
-    response: Response,
-    db: Session = Depends(get_db)
-):
+async def readiness_check(response: Response, db: Session = Depends(get_db)):
     """
     Readiness check.
 
@@ -75,6 +70,7 @@ async def readiness_check(
     # Speaker Verification
     try:
         from ...layer1_speaker import MODEL
+
         if MODEL is not None:
             model_checks.speaker_verification = ModelStatus.OK
         else:
@@ -87,6 +83,7 @@ async def readiness_check(
     # Deepfake Detection
     try:
         from ...layer2_deepfake import _MODEL
+
         if _MODEL is not None:
             model_checks.deepfake_detection = ModelStatus.OK
         else:
@@ -99,6 +96,7 @@ async def readiness_check(
     # ASR
     try:
         from ...layer3_asr import _whisper_model
+
         if _whisper_model is not None:
             model_checks.asr = ModelStatus.OK
         else:
@@ -115,8 +113,4 @@ async def readiness_check(
     if not all_ready:
         response.status_code = 503
 
-    return ReadinessResponse(
-        status=status,
-        timestamp=datetime.utcnow(),
-        checks=checks
-    )
+    return ReadinessResponse(status=status, timestamp=datetime.utcnow(), checks=checks)

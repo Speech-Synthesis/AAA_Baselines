@@ -5,12 +5,12 @@ Note: Modern high-quality TTS (ElevenLabs, etc.) may evade detection
 """
 
 import io
-import torch
+
 import numpy as np
 import soundfile as sf
+import torch
 from scipy import signal
-from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
-from typing import Optional
+from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
 # Model: garystafford/wav2vec2-deepfake-voice-detector
 # Labels: {0: 'real', 1: 'fake'}
@@ -69,10 +69,7 @@ def detect_spoof(audio_bytes: bytes) -> dict:
         waveform = _load_audio(audio_bytes)
 
         inputs = _FEATURE_EXTRACTOR(
-            waveform,
-            sampling_rate=16000,
-            return_tensors="pt",
-            padding=True
+            waveform, sampling_rate=16000, return_tensors="pt", padding=True
         )
 
         device = next(_MODEL.parameters()).device
@@ -94,10 +91,7 @@ def detect_spoof(audio_bytes: bytes) -> dict:
             label = "spoof"
             confidence = fake_prob
 
-        return {
-            "label": label,
-            "confidence": float(confidence)
-        }
+        return {"label": label, "confidence": float(confidence)}
 
     except Exception as e:
         print(f"Error in detect_spoof: {e}")

@@ -3,13 +3,15 @@ Unit Tests for Voiceprint Biometric Encryption (AES-256-GCM)
 Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 """
 
-import unittest
 import os
+import unittest
+
 from app.security.voiceprint_crypto import (
-    VoiceprintEncryptor,
     VoiceprintDecryptionError,
+    VoiceprintEncryptor,
     derive_tenant_voiceprint_key,
 )
+
 
 class TestVoiceprintCrypto(unittest.TestCase):
     def setUp(self):
@@ -24,7 +26,7 @@ class TestVoiceprintCrypto(unittest.TestCase):
 
         decrypted = self.encryptor.decrypt(ciphertext, nonce)
         self.assertEqual(len(decrypted), 192)
-        for original, restored in zip(self.dummy_embedding, decrypted):
+        for original, restored in zip(self.dummy_embedding, decrypted, strict=True):
             self.assertAlmostEqual(original, restored, places=4)
 
     def test_packed_format(self):
@@ -53,6 +55,7 @@ class TestVoiceprintCrypto(unittest.TestCase):
         self.assertNotEqual(key_alpha, key_beta)
         self.assertEqual(len(key_alpha), 32)
         self.assertEqual(len(key_beta), 32)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,13 +4,15 @@ Handles dynamic challenges, HMAC-signed token verification with 90s TTL,
 single-use enforcement, and adaptive EMA voiceprint updates.
 """
 
-import os
-import secrets
-import hmac
 import hashlib
+import hmac
+import os
 import random
+import secrets
 from datetime import datetime, timedelta
-from typing import Optional
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 # Secret key for HMAC token signing (MUST be set via environment variable)
 _hmac_secret = os.environ.get("L3_HMAC_SECRET")
@@ -18,14 +20,17 @@ if not _hmac_secret:
     # Allow import to succeed in DEBUG mode for development/testing
     # Production MUST have L3_HMAC_SECRET set
     import warnings
+
     if os.environ.get("DEBUG", "").lower() in ("true", "1", "yes"):
         warnings.warn(
             "L3_HMAC_SECRET not set - using insecure default for DEBUG mode only",
-            RuntimeWarning
+            RuntimeWarning,
+            stacklevel=2,
         )
-        _hmac_secret = "INSECURE_DEBUG_SECRET_DO_NOT_USE_IN_PRODUCTION"
+        _hmac_secret = "INSECURE_DEBUG_SECRET_DO_NOT_USE_IN_PRODUCTION"  # noqa: S105
     else:
         from .core.exceptions import MissingSecretError
+
         raise MissingSecretError("L3_HMAC_SECRET environment variable must be set")
 
 SECRET_KEY = _hmac_secret.encode()
@@ -37,100 +42,443 @@ SECRET_KEY = _hmac_secret.encode()
 
 # Numbers (spoken form)
 NUMBERS = [
-    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
-    "seventeen", "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty",
-    "sixty", "seventy", "eighty", "ninety", "hundred"
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+    "hundred",
 ]
 
 # Colors - extensive list
 COLORS = [
-    "red", "blue", "green", "yellow", "orange", "purple", "pink", "brown",
-    "black", "white", "gray", "silver", "gold", "bronze", "copper",
-    "crimson", "scarlet", "maroon", "ruby", "coral", "salmon", "peach",
-    "amber", "golden", "honey", "mustard", "lemon", "lime", "olive",
-    "emerald", "jade", "mint", "teal", "turquoise", "cyan", "aqua",
-    "navy", "cobalt", "indigo", "violet", "lavender", "plum", "magenta",
-    "rose", "burgundy", "ivory", "cream", "beige", "tan", "khaki"
+    "red",
+    "blue",
+    "green",
+    "yellow",
+    "orange",
+    "purple",
+    "pink",
+    "brown",
+    "black",
+    "white",
+    "gray",
+    "silver",
+    "gold",
+    "bronze",
+    "copper",
+    "crimson",
+    "scarlet",
+    "maroon",
+    "ruby",
+    "coral",
+    "salmon",
+    "peach",
+    "amber",
+    "golden",
+    "honey",
+    "mustard",
+    "lemon",
+    "lime",
+    "olive",
+    "emerald",
+    "jade",
+    "mint",
+    "teal",
+    "turquoise",
+    "cyan",
+    "aqua",
+    "navy",
+    "cobalt",
+    "indigo",
+    "violet",
+    "lavender",
+    "plum",
+    "magenta",
+    "rose",
+    "burgundy",
+    "ivory",
+    "cream",
+    "beige",
+    "tan",
+    "khaki",
 ]
 
 # Animals - easy to pronounce
 ANIMALS = [
-    "falcon", "eagle", "hawk", "owl", "raven", "sparrow", "robin", "dove",
-    "phoenix", "dragon", "griffin", "panther", "tiger", "lion", "leopard",
-    "wolf", "fox", "bear", "deer", "elk", "moose", "buffalo", "bison",
-    "horse", "zebra", "dolphin", "whale", "shark", "salmon", "trout",
-    "cobra", "python", "viper", "falcon", "condor", "pelican", "crane",
-    "heron", "swan", "goose", "duck", "penguin", "puffin", "parrot",
-    "jaguar", "cheetah", "cougar", "lynx", "bobcat", "otter", "beaver",
-    "rabbit", "squirrel", "chipmunk", "hedgehog", "badger", "raccoon"
+    "falcon",
+    "eagle",
+    "hawk",
+    "owl",
+    "raven",
+    "sparrow",
+    "robin",
+    "dove",
+    "phoenix",
+    "dragon",
+    "griffin",
+    "panther",
+    "tiger",
+    "lion",
+    "leopard",
+    "wolf",
+    "fox",
+    "bear",
+    "deer",
+    "elk",
+    "moose",
+    "buffalo",
+    "bison",
+    "horse",
+    "zebra",
+    "dolphin",
+    "whale",
+    "shark",
+    "salmon",
+    "trout",
+    "cobra",
+    "python",
+    "viper",
+    "falcon",
+    "condor",
+    "pelican",
+    "crane",
+    "heron",
+    "swan",
+    "goose",
+    "duck",
+    "penguin",
+    "puffin",
+    "parrot",
+    "jaguar",
+    "cheetah",
+    "cougar",
+    "lynx",
+    "bobcat",
+    "otter",
+    "beaver",
+    "rabbit",
+    "squirrel",
+    "chipmunk",
+    "hedgehog",
+    "badger",
+    "raccoon",
 ]
 
 # Objects - tangible things
 OBJECTS = [
-    "shield", "sword", "arrow", "spear", "hammer", "anchor", "compass",
-    "crystal", "diamond", "emerald", "ruby", "sapphire", "pearl", "opal",
-    "mountain", "river", "ocean", "forest", "desert", "island", "valley",
-    "castle", "tower", "bridge", "gateway", "fortress", "temple", "palace",
-    "sunrise", "sunset", "moonlight", "starlight", "thunder", "lightning",
-    "beacon", "lantern", "torch", "candle", "mirror", "window", "doorway",
-    "garden", "meadow", "orchard", "vineyard", "harbor", "lighthouse",
-    "canyon", "glacier", "volcano", "waterfall", "rainbow", "horizon"
+    "shield",
+    "sword",
+    "arrow",
+    "spear",
+    "hammer",
+    "anchor",
+    "compass",
+    "crystal",
+    "diamond",
+    "emerald",
+    "ruby",
+    "sapphire",
+    "pearl",
+    "opal",
+    "mountain",
+    "river",
+    "ocean",
+    "forest",
+    "desert",
+    "island",
+    "valley",
+    "castle",
+    "tower",
+    "bridge",
+    "gateway",
+    "fortress",
+    "temple",
+    "palace",
+    "sunrise",
+    "sunset",
+    "moonlight",
+    "starlight",
+    "thunder",
+    "lightning",
+    "beacon",
+    "lantern",
+    "torch",
+    "candle",
+    "mirror",
+    "window",
+    "doorway",
+    "garden",
+    "meadow",
+    "orchard",
+    "vineyard",
+    "harbor",
+    "lighthouse",
+    "canyon",
+    "glacier",
+    "volcano",
+    "waterfall",
+    "rainbow",
+    "horizon",
 ]
 
 # Abstract concepts - meaningful words
 CONCEPTS = [
-    "nexus", "matrix", "cipher", "prism", "echo", "pulse", "spark",
-    "spirit", "shadow", "light", "flame", "frost", "storm", "breeze",
-    "harmony", "balance", "unity", "wisdom", "courage", "honor", "valor",
-    "justice", "mercy", "grace", "truth", "peace", "freedom", "victory",
-    "journey", "quest", "mission", "voyage", "venture", "passage", "path",
-    "legacy", "heritage", "destiny", "fortune", "wonder", "marvel", "dream",
-    "vision", "insight", "clarity", "focus", "purpose", "resolve", "strength"
+    "nexus",
+    "matrix",
+    "cipher",
+    "prism",
+    "echo",
+    "pulse",
+    "spark",
+    "spirit",
+    "shadow",
+    "light",
+    "flame",
+    "frost",
+    "storm",
+    "breeze",
+    "harmony",
+    "balance",
+    "unity",
+    "wisdom",
+    "courage",
+    "honor",
+    "valor",
+    "justice",
+    "mercy",
+    "grace",
+    "truth",
+    "peace",
+    "freedom",
+    "victory",
+    "journey",
+    "quest",
+    "mission",
+    "voyage",
+    "venture",
+    "passage",
+    "path",
+    "legacy",
+    "heritage",
+    "destiny",
+    "fortune",
+    "wonder",
+    "marvel",
+    "dream",
+    "vision",
+    "insight",
+    "clarity",
+    "focus",
+    "purpose",
+    "resolve",
+    "strength",
 ]
 
 # Adjectives - descriptive words
 ADJECTIVES = [
-    "swift", "brave", "bold", "calm", "wise", "keen", "bright", "clear",
-    "strong", "gentle", "noble", "loyal", "true", "pure", "grand", "great",
-    "ancient", "modern", "classic", "timeless", "endless", "boundless",
-    "silent", "peaceful", "tranquil", "serene", "graceful", "elegant",
-    "mighty", "powerful", "fearless", "steadfast", "resolute", "determined",
-    "radiant", "brilliant", "luminous", "vibrant", "vivid", "dynamic",
-    "majestic", "regal", "royal", "supreme", "prime", "premier", "stellar",
-    "cosmic", "eternal", "infinite", "pristine", "crystal", "diamond"
+    "swift",
+    "brave",
+    "bold",
+    "calm",
+    "wise",
+    "keen",
+    "bright",
+    "clear",
+    "strong",
+    "gentle",
+    "noble",
+    "loyal",
+    "true",
+    "pure",
+    "grand",
+    "great",
+    "ancient",
+    "modern",
+    "classic",
+    "timeless",
+    "endless",
+    "boundless",
+    "silent",
+    "peaceful",
+    "tranquil",
+    "serene",
+    "graceful",
+    "elegant",
+    "mighty",
+    "powerful",
+    "fearless",
+    "steadfast",
+    "resolute",
+    "determined",
+    "radiant",
+    "brilliant",
+    "luminous",
+    "vibrant",
+    "vivid",
+    "dynamic",
+    "majestic",
+    "regal",
+    "royal",
+    "supreme",
+    "prime",
+    "premier",
+    "stellar",
+    "cosmic",
+    "eternal",
+    "infinite",
+    "pristine",
+    "crystal",
+    "diamond",
 ]
 
 # Verbs (action words in imperative/present form)
 VERBS = [
-    "soar", "glide", "leap", "dash", "sprint", "march", "stride", "venture",
-    "guard", "shield", "protect", "defend", "secure", "watch", "observe",
-    "seek", "find", "discover", "explore", "journey", "travel", "roam",
-    "shine", "glow", "spark", "blaze", "flare", "flash", "gleam", "beam",
-    "rise", "climb", "ascend", "lift", "surge", "flow", "drift", "float",
-    "unite", "join", "connect", "link", "bind", "forge", "craft", "build",
-    "lead", "guide", "direct", "steer", "navigate", "chart", "pioneer"
+    "soar",
+    "glide",
+    "leap",
+    "dash",
+    "sprint",
+    "march",
+    "stride",
+    "venture",
+    "guard",
+    "shield",
+    "protect",
+    "defend",
+    "secure",
+    "watch",
+    "observe",
+    "seek",
+    "find",
+    "discover",
+    "explore",
+    "journey",
+    "travel",
+    "roam",
+    "shine",
+    "glow",
+    "spark",
+    "blaze",
+    "flare",
+    "flash",
+    "gleam",
+    "beam",
+    "rise",
+    "climb",
+    "ascend",
+    "lift",
+    "surge",
+    "flow",
+    "drift",
+    "float",
+    "unite",
+    "join",
+    "connect",
+    "link",
+    "bind",
+    "forge",
+    "craft",
+    "build",
+    "lead",
+    "guide",
+    "direct",
+    "steer",
+    "navigate",
+    "chart",
+    "pioneer",
 ]
 
 # Locations/Places
 PLACES = [
-    "north", "south", "east", "west", "central", "coastal", "highland",
-    "summit", "peak", "ridge", "cliff", "shore", "bay", "cove", "inlet",
-    "grove", "glade", "clearing", "hollow", "dell", "glen", "vale",
-    "plaza", "square", "court", "avenue", "boulevard", "terrace", "arcade",
-    "station", "terminal", "junction", "crossing", "gateway", "portal"
+    "north",
+    "south",
+    "east",
+    "west",
+    "central",
+    "coastal",
+    "highland",
+    "summit",
+    "peak",
+    "ridge",
+    "cliff",
+    "shore",
+    "bay",
+    "cove",
+    "inlet",
+    "grove",
+    "glade",
+    "clearing",
+    "hollow",
+    "dell",
+    "glen",
+    "vale",
+    "plaza",
+    "square",
+    "court",
+    "avenue",
+    "boulevard",
+    "terrace",
+    "arcade",
+    "station",
+    "terminal",
+    "junction",
+    "crossing",
+    "gateway",
+    "portal",
 ]
 
 # Time references
 TIME_WORDS = [
-    "dawn", "dusk", "twilight", "midnight", "noon", "morning", "evening",
-    "spring", "summer", "autumn", "winter", "solstice", "equinox",
-    "century", "decade", "moment", "instant", "epoch", "era", "age"
+    "dawn",
+    "dusk",
+    "twilight",
+    "midnight",
+    "noon",
+    "morning",
+    "evening",
+    "spring",
+    "summer",
+    "autumn",
+    "winter",
+    "solstice",
+    "equinox",
+    "century",
+    "decade",
+    "moment",
+    "instant",
+    "epoch",
+    "era",
+    "age",
 ]
 
 # =============================================================================
 # PHRASE TEMPLATES - Multiple structures for variety
 # =============================================================================
+
 
 def _generate_dynamic_phrase() -> str:
     """
@@ -202,13 +550,11 @@ def _generate_dynamic_phrase() -> str:
         # Sentence: "From PLACE to PLACE the ANIMAL travels"
         return f"From {random.choice(PLACES)} to {random.choice(PLACES)} the {random.choice(ANIMALS)} travels"
 
+
 # =============================================================================
 # DATABASE-BACKED TOKEN PERSISTENCE
 # Replaces in-memory storage for production reliability
 # =============================================================================
-
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 
 def generate_challenge(user_id: str, db: Session = None) -> dict:
@@ -235,21 +581,18 @@ def generate_challenge(user_id: str, db: Session = None) -> dict:
     # Create raw payload and sign with HMAC-SHA256
     raw_nonce = secrets.token_hex(16)
     raw_payload = f"{user_id}:{expires_timestamp}:{phrase}:{raw_nonce}"
-    signature = hmac.new(SECRET_KEY, raw_payload.encode('utf-8'), hashlib.sha256).hexdigest()
+    signature = hmac.new(SECRET_KEY, raw_payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
     # URL-safe HMAC token
     token = f"{raw_nonce}.{expires_timestamp}.{signature}"
 
-    result = {
-        "phrase": phrase,
-        "token": token,
-        "expires_at": expires_at
-    }
+    result = {"phrase": phrase, "token": token, "expires_at": expires_at}
 
     # Persist to database if session provided
     if db is not None:
-        from .models import Challenge
         import uuid
+
+        from .models import Challenge
 
         challenge = Challenge(
             id=uuid.uuid4(),
@@ -259,7 +602,7 @@ def generate_challenge(user_id: str, db: Session = None) -> dict:
             signature=signature,
             payload=raw_payload,
             expires_at=expires_at,
-            used=False
+            used=False,
         )
         db.add(challenge)
         db.commit()
@@ -304,7 +647,7 @@ def verify_token(token: str, db: Session = None) -> bool:
               AND used = 0
               AND expires_at > :now
         """),
-        {"token": token, "now": now}
+        {"token": token, "now": now},
     )
     db.commit()
 
@@ -315,12 +658,13 @@ def verify_token(token: str, db: Session = None) -> bool:
     # Verify HMAC signature
     challenge = db.query(Challenge).filter(Challenge.token == token).first()
     if challenge and challenge.payload:
-        expected_sig = hmac.new(SECRET_KEY, challenge.payload.encode('utf-8'), hashlib.sha256).hexdigest()
+        expected_sig = hmac.new(
+            SECRET_KEY, challenge.payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         if not hmac.compare_digest(challenge.signature or "", expected_sig):
             # Signature mismatch - revert the used flag and return False
             db.execute(
-                text("UPDATE challenges SET used = 0 WHERE token = :token"),
-                {"token": token}
+                text("UPDATE challenges SET used = 0 WHERE token = :token"), {"token": token}
             )
             db.commit()
             return False
@@ -328,7 +672,7 @@ def verify_token(token: str, db: Session = None) -> bool:
     return True
 
 
-def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
+def validate_and_consume_token(token: str, db: Session) -> dict | None:
     """
     Atomically validate and consume a challenge token.
 
@@ -358,7 +702,7 @@ def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
               AND used = 0
               AND expires_at > :now
         """),
-        {"token": token, "now": now}
+        {"token": token, "now": now},
     )
     db.commit()
 
@@ -373,12 +717,13 @@ def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
 
     # Verify HMAC signature
     if challenge.payload:
-        expected_sig = hmac.new(SECRET_KEY, challenge.payload.encode('utf-8'), hashlib.sha256).hexdigest()
+        expected_sig = hmac.new(
+            SECRET_KEY, challenge.payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         if not hmac.compare_digest(challenge.signature or "", expected_sig):
             # Signature mismatch - revert the used flag and return None
             db.execute(
-                text("UPDATE challenges SET used = 0 WHERE token = :token"),
-                {"token": token}
+                text("UPDATE challenges SET used = 0 WHERE token = :token"), {"token": token}
             )
             db.commit()
             return None
@@ -388,11 +733,11 @@ def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
         "user_id": str(challenge.user_id),
         "phrase": challenge.phrase,
         "token": challenge.token,
-        "expires_at": challenge.expires_at
+        "expires_at": challenge.expires_at,
     }
 
 
-def get_token_user_id(token: str, db: Session = None) -> Optional[str]:
+def get_token_user_id(token: str, db: Session = None) -> str | None:
     """Get the user_id associated with a token."""
     if not token:
         return None
@@ -401,13 +746,14 @@ def get_token_user_id(token: str, db: Session = None) -> Optional[str]:
         return None
 
     from .models import Challenge
+
     challenge = db.query(Challenge).filter(Challenge.token == token).first()
     if challenge:
         return str(challenge.user_id)
     return None
 
 
-def get_token_phrase(token: str, db: Session = None) -> Optional[str]:
+def get_token_phrase(token: str, db: Session = None) -> str | None:
     """Get the challenge phrase associated with a token."""
     if not token:
         return None
@@ -416,6 +762,7 @@ def get_token_phrase(token: str, db: Session = None) -> Optional[str]:
         return None
 
     from .models import Challenge
+
     challenge = db.query(Challenge).filter(Challenge.token == token).first()
     if challenge:
         return challenge.phrase
@@ -435,10 +782,7 @@ def cleanup_expired_tokens(db: Session) -> int:
         Number of tokens deleted
     """
     now = datetime.utcnow()
-    result = db.execute(
-        text("DELETE FROM challenges WHERE expires_at < :now"),
-        {"now": now}
-    )
+    result = db.execute(text("DELETE FROM challenges WHERE expires_at < :now"), {"now": now})
     db.commit()
     return result.rowcount
 
@@ -449,9 +793,7 @@ _token_store: dict[str, dict] = {}
 
 
 def update_voiceprint(
-    old_embedding: list[float],
-    new_embedding: list[float],
-    alpha: float = 0.2
+    old_embedding: list[float], new_embedding: list[float], alpha: float = 0.2
 ) -> list[float]:
     """
     Exponential Moving Average update of voiceprint.
@@ -475,8 +817,7 @@ def update_voiceprint(
     # Calculate elementwise: 0.8 * old + 0.2 * current
     updated = [
         (1.0 - alpha) * old_val + alpha * new_val
-        for old_val, new_val in zip(old_embedding, new_embedding)
+        for old_val, new_val in zip(old_embedding, new_embedding, strict=True)
     ]
 
     return updated
-

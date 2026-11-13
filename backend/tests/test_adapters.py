@@ -3,8 +3,6 @@ AAA Engine Model Adapter Tests
 Tests for mock and base adapter functionality.
 """
 
-import pytest
-
 
 class TestMockSpeakerAdapter:
     """Tests for MockSpeakerAdapter."""

@@ -3,7 +3,7 @@ ECAPA-TDNN Speaker Verification Adapter
 Wraps the existing layer1_speaker module.
 """
 
-from .base import SpeakerVerificationAdapter, SpeakerResult, ModelInfo
+from .base import ModelInfo, SpeakerResult, SpeakerVerificationAdapter
 
 
 class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
@@ -23,7 +23,7 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
             name="ECAPA-TDNN Speaker Verification",
             version="1.0.0",
             model_id="speechbrain/spkrec-ecapa-voxceleb",
-            is_loaded=self._loaded
+            is_loaded=self._loaded,
         )
 
     def is_ready(self) -> bool:
@@ -32,7 +32,6 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
     def load(self) -> bool:
         """Load the model (delegated to layer1_speaker on first use)."""
         try:
-            from ..layer1_speaker import enroll_speaker
             # Trigger model loading by calling with minimal audio
             # The actual model is lazily loaded in layer1_speaker
             self._loaded = True
@@ -61,17 +60,9 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
         result = enroll_speaker(audio_bytes)
         self._loaded = True
 
-        return SpeakerResult(
-            embedding=result["embedding"],
-            score=None,
-            is_match=False
-        )
+        return SpeakerResult(embedding=result["embedding"], score=None, is_match=False)
 
-    def compare_embeddings(
-        self,
-        embedding1: list[float],
-        embedding2: list[float]
-    ) -> float:
+    def compare_embeddings(self, embedding1: list[float], embedding2: list[float]) -> float:
         """
         Compare embeddings using cosine similarity.
 
@@ -102,10 +93,7 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
         return float(max(0.0, min(1.0, similarity)))
 
     def verify_speaker(
-        self,
-        audio_bytes: bytes,
-        enrolled_embedding: list[float],
-        threshold: float = 0.5
+        self, audio_bytes: bytes, enrolled_embedding: list[float], threshold: float = 0.5
     ) -> SpeakerResult:
         """
         Verify speaker using existing layer1_speaker.verify_speaker.
@@ -126,5 +114,5 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
         return SpeakerResult(
             embedding=result["embedding"],
             score=result["score"],
-            is_match=result["score"] >= threshold
+            is_match=result["score"] >= threshold,
         )

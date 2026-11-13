@@ -7,12 +7,12 @@ Role: Security & Perimeter Defense Engineer
 """
 
 import uuid
-from typing import Optional
+
 from fastapi import APIRouter, Depends, Header, status
 
-from ...security.jwt_auth import get_current_tenant, enforce_rate_limit
-from ...schemas.risk import TranscriptRiskRequest, TranscriptRiskResponse
 from ...adapters.vr import TranscriptRiskAdapter
+from ...schemas.risk import TranscriptRiskRequest, TranscriptRiskResponse
+from ...security.jwt_auth import enforce_rate_limit, get_current_tenant
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
@@ -25,12 +25,12 @@ _risk_adapter = TranscriptRiskAdapter()
     response_model=TranscriptRiskResponse,
     status_code=status.HTTP_200_OK,
     summary="Submit Transcript for Risk Analysis (AAA-VR)",
-    description="Analyzes conversational transcript for vishing, coercion, and fraud indicators."
+    description="Analyzes conversational transcript for vishing, coercion, and fraud indicators.",
 )
 def evaluate_transcript_risk(
     request: TranscriptRiskRequest,
     tenant_id: str = Depends(get_current_tenant),
-    x_request_id: Optional[str] = Header(None, alias="X-Request-ID"),
+    x_request_id: str | None = Header(None, alias="X-Request-ID"),
     _: None = Depends(enforce_rate_limit),
 ) -> TranscriptRiskResponse:
     """

@@ -4,9 +4,10 @@ Uses speechbrain/spkrec-ecapa-voxceleb for 192-dim embeddings
 """
 
 import io
-import torch
-import soundfile as sf
+
 import numpy as np
+import soundfile as sf
+import torch
 from scipy import signal
 from speechbrain.inference.speaker import EncoderClassifier
 from speechbrain.utils.fetching import LocalStrategy
@@ -18,7 +19,7 @@ MODEL = EncoderClassifier.from_hparams(
     source="speechbrain/spkrec-ecapa-voxceleb",
     savedir="pretrained_models/spkrec-ecapa-voxceleb",
     run_opts={"device": "cpu"},  # Use CPU for demo; change to "cuda" if GPU available
-    local_strategy=LocalStrategy.COPY
+    local_strategy=LocalStrategy.COPY,
 )
 
 
@@ -31,6 +32,7 @@ def _load_audio(audio_bytes: bytes) -> torch.Tensor:
         audio_data, sample_rate = sf.read(io.BytesIO(audio_bytes))
     except Exception:
         import librosa
+
         audio_data, sample_rate = librosa.load(io.BytesIO(audio_bytes), sr=16000)
 
     # Convert to mono if stereo
@@ -62,10 +64,7 @@ def _cosine_similarity(embedding1: torch.Tensor, embedding2: torch.Tensor) -> fl
     e2 = embedding2.flatten()
 
     # Cosine similarity: ranges from -1 to 1
-    cos_sim = torch.nn.functional.cosine_similarity(
-        e1.unsqueeze(0),
-        e2.unsqueeze(0)
-    ).item()
+    cos_sim = torch.nn.functional.cosine_similarity(e1.unsqueeze(0), e2.unsqueeze(0)).item()
 
     # Clamp to [0, 1] - negative similarity means very different, treat as 0
     # Don't use (cos_sim + 1) / 2 as it inflates scores for different speakers
@@ -117,7 +116,4 @@ def verify_speaker(audio_bytes: bytes, stored_embedding: list[float]) -> dict:
     # Compute similarity score
     score = _cosine_similarity(new_embedding, stored_tensor)
 
-    return {
-        "score": float(score),
-        "embedding": new_embedding.tolist()
-    }
+    return {"score": float(score), "embedding": new_embedding.tolist()}

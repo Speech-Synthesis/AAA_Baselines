@@ -3,11 +3,11 @@ AAA Engine Rate Limiting
 Configurable rate limiting for API endpoints.
 """
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from .config import get_settings
 
@@ -40,8 +40,6 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
     Custom handler for rate limit exceeded errors.
     Returns a standardized JSON response.
     """
-    settings = get_settings()
-
     return JSONResponse(
         status_code=429,
         content={
@@ -50,13 +48,13 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
             "retry_after": getattr(exc, "retry_after", 60),
             "details": {
                 "limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown",
-                "documentation": "See API documentation for rate limit details"
-            }
+                "documentation": "See API documentation for rate limit details",
+            },
         },
         headers={
             "Retry-After": str(getattr(exc, "retry_after", 60)),
-            "X-RateLimit-Limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown"
-        }
+            "X-RateLimit-Limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown",
+        },
     )
 
 

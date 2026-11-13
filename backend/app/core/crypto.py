@@ -1,10 +1,11 @@
 """
 Bridge module exposing VoiceprintEncryptor to core.crypto.
 """
+
 from ..security.voiceprint_crypto import (
-    VoiceprintEncryptor,
     VoiceprintCryptoError,
     VoiceprintDecryptionError,
+    VoiceprintEncryptor,
     derive_tenant_voiceprint_key,
 )
 

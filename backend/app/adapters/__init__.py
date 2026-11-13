@@ -3,20 +3,20 @@ AAA Engine Model Adapters
 Abstraction layer for ML model integration.
 """
 
-from .base import (
-    ModelAdapter,
-    SpeakerVerificationAdapter,
-    DeepfakeDetectionAdapter,
-    ASRAdapter,
-)
-from .sv import EcapaSpeakerAdapter
 from .ad import Wav2VecDeepfakeAdapter
 from .asr import WhisperASRAdapter
-from .mock import (
-    MockSpeakerAdapter,
-    MockDeepfakeAdapter,
-    MockASRAdapter,
+from .base import (
+    ASRAdapter,
+    DeepfakeDetectionAdapter,
+    ModelAdapter,
+    SpeakerVerificationAdapter,
 )
+from .mock import (
+    MockASRAdapter,
+    MockDeepfakeAdapter,
+    MockSpeakerAdapter,
+)
+from .sv import EcapaSpeakerAdapter
 from .vr import TranscriptRiskAdapter
 
 __all__ = [

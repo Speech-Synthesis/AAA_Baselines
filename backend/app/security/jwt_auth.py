@@ -6,47 +6,48 @@ Author: Karthik Mallareddy (mrkarthik1811@gmail.com)
 Role: Security & Perimeter Defense Engineer
 """
 
+import hashlib
+import hmac
+import logging
 import os
 import time
 import uuid
-import hmac
-import hashlib
-import logging
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone
+from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, status, Header
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from jose import jwt, JWTError, ExpiredSignatureError
+from fastapi.security import OAuth2PasswordBearer
+from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWTClaimsError
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
 logger = logging.getLogger("aaa_engine.security.jwt_auth")
 
-DISALLOWED_WEAK_SECRETS = frozenset([
-    "secret",
-    "changeme",
-    "test",
-    "password",
-    "admin",
-    "12345678",
-    "1234567890",
-    "aaa-engine-secret-key-change-in-production",
-    "your-secret-key-here",
-    "default",
-    "development",
-    "supersecret",
-    "jwtsecret",
-    "qwerty",
-    "letmein",
-    "root",
-    "tokensecret",
-    "keyboardcat",
-])
+DISALLOWED_WEAK_SECRETS = frozenset(
+    [
+        "secret",
+        "changeme",
+        "test",
+        "password",
+        "admin",
+        "12345678",
+        "1234567890",
+        "aaa-engine-secret-key-change-in-production",
+        "your-secret-key-here",
+        "default",
+        "development",
+        "supersecret",
+        "jwtsecret",
+        "qwerty",
+        "letmein",
+        "root",
+        "tokensecret",
+        "keyboardcat",
+    ]
+)
 
 MINIMUM_KEY_LENGTH = 32
 JWT_ALGORITHM = "HS256"
@@ -55,6 +56,7 @@ JWT_ISSUER = "aaa-auth-service"
 TOKEN_EXPIRATION_SECONDS = 900
 
 _UNSET = object()
+
 
 def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
     key = os.getenv("AAA_JWT_SECRET") if secret_candidate is _UNSET else secret_candidate
@@ -85,17 +87,23 @@ def validate_jwt_secret(secret_candidate: Any = _UNSET) -> str:
         )
     return key_str
 
+
 JWT_SECRET: str = validate_jwt_secret()
+
 
 class TokenRequest(BaseModel):
     client_id: str = Field(..., description="Unique host application client identifier")
     client_secret: str = Field(..., description="Pre-shared host application secret")
     tenant_id: str = Field(..., description="Target tenant ID for database isolation")
 
+
 class TokenResponse(BaseModel):
     access_token: str = Field(..., description="Signed JWT access token binding tenant claims")
     token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(default=TOKEN_EXPIRATION_SECONDS, description="Token lifespan in seconds (900s / 15m)")
+    expires_in: int = Field(
+        default=TOKEN_EXPIRATION_SECONDS, description="Token lifespan in seconds (900s / 15m)"
+    )
+
 
 class TokenPayload(BaseModel):
     tenant_id: str
@@ -107,26 +115,33 @@ class TokenPayload(BaseModel):
     exp: int
     jti: str
 
-_MOCK_API_CLIENTS: Dict[str, Dict[str, Any]] = {
+
+_MOCK_API_CLIENTS: dict[str, dict[str, Any]] = {
     "banking-shield-core": {
-        "secret_hash": hashlib.sha256("banking-shield-super-secure-production-secret-2026".encode()).hexdigest(),
+        "secret_hash": hashlib.sha256(
+            b"banking-shield-super-secure-production-secret-2026"
+        ).hexdigest(),
         "allowed_tenants": ["bank-alpha-001", "bank-beta-002", "tenant-test-default"],
     },
     "callguard-agent": {
-        "secret_hash": hashlib.sha256("callguard-telecom-perimeter-secret-key-9988".encode()).hexdigest(),
+        "secret_hash": hashlib.sha256(b"callguard-telecom-perimeter-secret-key-9988").hexdigest(),
         "allowed_tenants": ["telco-omega-99", "tenant-test-default"],
     },
     "test-client-id": {
-        "secret_hash": hashlib.sha256("test-client-secret-key-32-characters-long!!".encode()).hexdigest(),
+        "secret_hash": hashlib.sha256(b"test-client-secret-key-32-characters-long!!").hexdigest(),
         "allowed_tenants": ["tenant-test-default", "tenant-alpha"],
     },
 }
 
-def register_mock_api_client(client_id: str, client_secret: str, allowed_tenants: List[str]) -> None:
+
+def register_mock_api_client(
+    client_id: str, client_secret: str, allowed_tenants: list[str]
+) -> None:
     _MOCK_API_CLIENTS[client_id] = {
         "secret_hash": hashlib.sha256(client_secret.encode()).hexdigest(),
         "allowed_tenants": allowed_tenants,
     }
+
 
 def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str) -> bool:
     client_record = _MOCK_API_CLIENTS.get(client_id)
@@ -140,7 +155,10 @@ def verify_client_credentials(client_id: str, client_secret: str, tenant_id: str
     is_tenant_valid = tenant_id in allowed_tenants or "*" in allowed_tenants
     return is_secret_valid and is_tenant_valid
 
-def create_tenant_token(tenant_id: str, client_id: str, expires_in_seconds: int = TOKEN_EXPIRATION_SECONDS) -> str:
+
+def create_tenant_token(
+    tenant_id: str, client_id: str, expires_in_seconds: int = TOKEN_EXPIRATION_SECONDS
+) -> str:
     now = int(time.time())
     payload = {
         "sub": tenant_id,
@@ -154,20 +172,19 @@ def create_tenant_token(tenant_id: str, client_id: str, expires_in_seconds: int 
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+
 router = APIRouter(tags=["auth"])
+
 
 @router.post(
     "/v1/auth/token",
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Client-Credential Token Exchange",
-    description="Exchanges host application client credentials for a tenant-scoped 15-minute JWT."
+    description="Exchanges host application client credentials for a tenant-scoped 15-minute JWT.",
 )
 @router.post(
-    "/token",
-    response_model=TokenResponse,
-    status_code=status.HTTP_200_OK,
-    include_in_schema=False
+    "/token", response_model=TokenResponse, status_code=status.HTTP_200_OK, include_in_schema=False
 )
 def exchange_token(request: TokenRequest) -> TokenResponse:
     is_authenticated = verify_client_credentials(
@@ -188,13 +205,15 @@ def exchange_token(request: TokenRequest) -> TokenResponse:
     )
     return TokenResponse(
         access_token=access_token,
-        token_type="bearer",
+        token_type="bearer",  # noqa: S106
         expires_in=TOKEN_EXPIRATION_SECONDS,
     )
 
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token", auto_error=False)
 
-def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+
+def get_current_tenant(token: str | None = Depends(oauth2_scheme)) -> str:
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -209,20 +228,20 @@ def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
             audience=JWT_AUDIENCE,
             issuer=JWT_ISSUER,
         )
-    except ExpiredSignatureError:
+    except ExpiredSignatureError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="TOKEN_EXPIRED",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-    except (JWTClaimsError, JWTError):
+        ) from err
+    except (JWTClaimsError, JWTError) as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="INVALID_CREDENTIALS",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from err
 
-    tenant_id: Optional[str] = payload.get("tenant_id") or payload.get("sub")
+    tenant_id: str | None = payload.get("tenant_id") or payload.get("sub")
     if not tenant_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -231,14 +250,16 @@ def get_current_tenant(token: Optional[str] = Depends(oauth2_scheme)) -> str:
         )
     return tenant_id
 
-_RATE_LIMIT_TRACKER: Dict[str, List[float]] = {}
-_LOCKOUT_FAILURES: Dict[str, int] = {}
-_LOCKED_ENTITIES: Dict[str, float] = {}
+
+_RATE_LIMIT_TRACKER: dict[str, list[float]] = {}
+_LOCKOUT_FAILURES: dict[str, int] = {}
+_LOCKED_ENTITIES: dict[str, float] = {}
 
 RATE_LIMIT_MAX_REQUESTS = 60
 RATE_LIMIT_WINDOW_SECONDS = 60.0
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_DURATION_SECONDS = 300.0
+
 
 def record_auth_failure(tenant_id: str, identifier: str) -> None:
     key = f"{tenant_id}:{identifier}"
@@ -247,20 +268,23 @@ def record_auth_failure(tenant_id: str, identifier: str) -> None:
     if failures >= LOCKOUT_THRESHOLD:
         _LOCKED_ENTITIES[key] = time.time() + LOCKOUT_DURATION_SECONDS
 
+
 def record_auth_success(tenant_id: str, identifier: str) -> None:
     key = f"{tenant_id}:{identifier}"
     _LOCKOUT_FAILURES.pop(key, None)
     _LOCKED_ENTITIES.pop(key, None)
+
 
 def reset_rate_limit_state() -> None:
     _RATE_LIMIT_TRACKER.clear()
     _LOCKOUT_FAILURES.clear()
     _LOCKED_ENTITIES.clear()
 
+
 def enforce_rate_limit(
     tenant_id: str = Depends(get_current_tenant),
-    client_id: Optional[str] = None,
-    user_ref: Optional[str] = None,
+    client_id: str | None = None,
+    user_ref: str | None = None,
 ) -> None:
     identifier = user_ref or client_id or "default"
     key = f"{tenant_id}:{identifier}"
@@ -275,9 +299,10 @@ def enforce_rate_limit(
         )
     _RATE_LIMIT_TRACKER[key].append(now)
 
+
 def enforce_lockout_policy(
     tenant_id: str = Depends(get_current_tenant),
-    user_ref: Optional[str] = None,
+    user_ref: str | None = None,
 ) -> None:
     identifier = user_ref or "default"
     key = f"{tenant_id}:{identifier}"
@@ -293,9 +318,10 @@ def enforce_lockout_policy(
             _LOCKED_ENTITIES.pop(key, None)
             _LOCKOUT_FAILURES.pop(key, None)
 
+
 def configure_cors(app: Any) -> None:
     raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-    parsed_origins: List[str] = []
+    parsed_origins: list[str] = []
     if raw_origins and raw_origins.strip():
         parsed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
 
@@ -306,7 +332,7 @@ def configure_cors(app: Any) -> None:
             "Wildcard origins are strictly prohibited on authenticated AAA middleware. "
             "Rejecting configuration and defaulting to an empty list [] to block all cross-origin requests."
         )
-        allowed_origins: List[str] = []
+        allowed_origins: list[str] = []
     else:
         allowed_origins = parsed_origins
 

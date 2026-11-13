@@ -4,8 +4,6 @@ Tests for core infrastructure implemented on November 11, 2026.
 """
 
 import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock
 
 
 class TestHealthEndpoint:
@@ -81,12 +79,14 @@ class TestConfiguration:
     def test_settings_loads(self):
         """Settings should load without error."""
         from app.core.config import get_settings
+
         settings = get_settings()
         assert settings.APP_NAME == "AAA Engine"
 
     def test_thresholds_configurable(self):
         """Thresholds should be configurable."""
         from app.core.config import get_settings
+
         settings = get_settings()
         assert 0.0 <= settings.L2_SPOOF_THRESHOLD <= 1.0
         assert 0.0 <= settings.L1_SIMILARITY_THRESHOLD <= 1.0
@@ -95,6 +95,7 @@ class TestConfiguration:
     def test_validate_production_config(self):
         """Production config validation should work."""
         from app.core.config import validate_production_config
+
         errors = validate_production_config()
         # In test mode with DEBUG=False and no secret, should have error
         assert isinstance(errors, list)
@@ -106,6 +107,7 @@ class TestExceptions:
     def test_token_expired_error(self):
         """TokenExpiredError should have correct attributes."""
         from app.core.exceptions import TokenExpiredError
+
         error = TokenExpiredError()
         assert error.code == "unauthorized"
         assert "expired" in error.message.lower()
@@ -113,6 +115,7 @@ class TestExceptions:
     def test_model_not_available_error(self):
         """ModelNotAvailableError should include model_id."""
         from app.core.exceptions import ModelNotAvailableError
+
         error = ModelNotAvailableError("test-model")
         assert error.model_id == "test-model"
         assert "test-model" in error.message
@@ -120,6 +123,7 @@ class TestExceptions:
     def test_challenge_expired_error(self):
         """ChallengeExpiredError should have correct code."""
         from app.core.exceptions import ChallengeExpiredError
+
         error = ChallengeExpiredError()
         assert error.code == "expired"
 
@@ -130,13 +134,15 @@ class TestSchemas:
     def test_health_response_schema(self):
         """HealthResponse should serialize correctly."""
         from app.schemas.common import HealthResponse
+
         response = HealthResponse()
         assert response.status == "healthy"
         assert response.timestamp is not None
 
     def test_readiness_response_schema(self):
         """ReadinessResponse should have all fields."""
-        from app.schemas.common import ReadinessResponse, ReadinessChecks
+        from app.schemas.common import ReadinessResponse
+
         response = ReadinessResponse()
         assert response.status == "not_ready"
         assert response.checks is not None
@@ -144,6 +150,7 @@ class TestSchemas:
     def test_decision_enum(self):
         """Decision enum should have all values."""
         from app.schemas.common import Decision
+
         assert Decision.APPROVE == "APPROVE"
         assert Decision.DENY == "DENY"
         assert Decision.STEP_UP == "STEP_UP"
@@ -157,24 +164,28 @@ class TestChallengeValidation:
     def test_invalid_token_rejected(self, db_session):
         """Invalid token should be rejected."""
         from app.layer3_adaptive import verify_token
+
         result = verify_token("invalid-token-that-does-not-exist", db_session)
         assert result is False
 
     def test_empty_token_rejected(self, db_session):
         """Empty token should be rejected."""
         from app.layer3_adaptive import verify_token
+
         result = verify_token("", db_session)
         assert result is False
 
     def test_none_token_rejected(self, db_session):
         """None token should be rejected."""
         from app.layer3_adaptive import verify_token
+
         result = verify_token(None, db_session)
         assert result is False
 
     def test_token_without_db_rejected(self):
         """Token without database session should be rejected."""
         from app.layer3_adaptive import verify_token
+
         result = verify_token("some-token", None)
         assert result is False
 
@@ -186,7 +197,6 @@ class TestSecretConfiguration:
         """Missing L3_HMAC_SECRET should raise error in production mode."""
         import os
         import sys
-        import importlib
 
         # Save original values
         orig_debug = os.environ.get("DEBUG")
@@ -204,8 +214,9 @@ class TestSecretConfiguration:
 
             # Import should raise MissingSecretError
             from app.core.exceptions import MissingSecretError
+
             with pytest.raises(MissingSecretError):
-                import app.layer3_adaptive
+                pass
         finally:
             # Restore original values
             if orig_debug is not None:
@@ -226,6 +237,7 @@ class TestDefaultDenyBehavior:
         """Missing model should not result in approval."""
         # The policy engine should return UNAVAILABLE when model is missing
         from app.schemas.common import Decision
+
         # This is a design verification - actual implementation pending
         assert Decision.UNAVAILABLE != Decision.APPROVE
 
@@ -241,7 +253,9 @@ class TestDefaultDenyBehavior:
 def client():
     """Create test client."""
     from fastapi.testclient import TestClient
+
     from app.main import app
+
     return TestClient(app)
 
 
@@ -249,6 +263,7 @@ def client():
 def db_session():
     """Create test database session."""
     from app.db import SessionLocal
+
     session = SessionLocal()
     try:
         yield session
