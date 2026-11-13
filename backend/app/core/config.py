@@ -5,7 +5,11 @@ Centralized configuration management with environment variable support.
 
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseModel as BaseSettings
+
 from functools import lru_cache
 
 
