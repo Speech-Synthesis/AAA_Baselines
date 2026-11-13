@@ -130,3 +130,61 @@ def verify_capture_grant(
         raise ChallengeLifecycleError("CAPTURE_GRANT_CHALLENGE_MISMATCH")
 
     return claims
+
+
+def validate_and_consume_challenge(
+    token: str,
+    stored_user_id: str,
+    stored_phrase: str,
+    current_state: ChallengeState,
+    expires_at_ts: int,
+    secret_key: Optional[bytes] = None,
+) -> Tuple[ChallengeState, Dict[str, Any]]:
+    """
+    Atomically validates HMAC signature, expiration, and enforces single-use semantics.
+    Transitions state to CONSUMED upon success.
+    """
+    now_ts = int(time.time())
+
+    # 1. Check TTL Expiration
+    if now_ts > expires_at_ts or current_state == ChallengeState.EXPIRED:
+        raise ChallengeLifecycleError("TOKEN_EXPIRED")
+
+    # 2. Check Single-Use State (Anti-Replay)
+    if current_state in (ChallengeState.CONSUMED, ChallengeState.COMPLETED):
+        raise ChallengeLifecycleError("TOKEN_ALREADY_USED")
+
+    if not can_transition(current_state, ChallengeState.CONSUMED):
+        raise InvalidStateTransitionError(f"Cannot transition from {current_state} to CONSUMED")
+
+    # 3. Parse Token
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise ChallengeLifecycleError("MALFORMED_TOKEN_STRUCTURE")
+
+    nonce, exp_str, signature = parts
+    try:
+        token_exp = int(exp_str)
+    except ValueError:
+        raise ChallengeLifecycleError("INVALID_TOKEN_EXPIRATION")
+
+    if now_ts > token_exp:
+        raise ChallengeLifecycleError("TOKEN_EXPIRED")
+
+    # 4. Constant-Time HMAC Signature Verification
+    secret = secret_key or os.environ.get("SECRET_KEY", "fallback-secret-for-signing-token!!").encode()
+    expected_payload = f"{stored_user_id}:{exp_str}:{stored_phrase}:{nonce}"
+    expected_sig = hmac.new(secret, expected_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(signature, expected_sig):
+        raise ChallengeLifecycleError("INVALID_TOKEN_SIGNATURE")
+
+    # 5. Atomic state update
+    new_state = ChallengeState.CONSUMED
+    metadata = {
+        "nonce": nonce,
+        "consumed_at": now_ts,
+        "user_id": stored_user_id,
+        "phrase": stored_phrase,
+    }
+    return new_state, metadata
