@@ -9,7 +9,7 @@ Role: Security & Perimeter Defense Engineer
 import os
 import time
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi import HTTPException, status, Request
 from pydantic import BaseModel, Field
