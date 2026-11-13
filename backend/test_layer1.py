@@ -76,7 +76,7 @@ def main():
     result_same = verify_speaker(verify_same_audio, stored_embedding)
     score_same = result_same["score"]
     print(f"    Similarity score: {score_same:.4f}")
-    print(f"    Expected: > 0.6 (same speaker)")
+    print("    Expected: > 0.6 (same speaker)")
     if score_same > 0.6:
         print("    PASS: Same speaker detected correctly")
     else:
@@ -88,7 +88,7 @@ def main():
     result_diff = verify_speaker(verify_diff_audio, stored_embedding)
     score_diff = result_diff["score"]
     print(f"    Similarity score: {score_diff:.4f}")
-    print(f"    Expected: < 0.6 (different speaker)")
+    print("    Expected: < 0.6 (different speaker)")
     if score_diff < 0.6:
         print("    PASS: Different speaker rejected correctly")
     else:

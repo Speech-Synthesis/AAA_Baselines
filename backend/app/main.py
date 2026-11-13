@@ -8,32 +8,28 @@ Updated by Surya (Nov 11, 2026):
 - Legacy routes preserved for backward compatibility
 """
 
-import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Query
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-from .db import get_db, engine, Base
-from .models import User, Voiceprint, Challenge, AuthLog
-from .layer1_speaker import enroll_speaker, verify_speaker
-from .layer2_deepfake import detect_spoof
-from .layer3_adaptive import generate_challenge, verify_token, update_voiceprint, get_token_user_id, get_token_phrase
-from .layer3_asr import verify_phrase
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy.orm import Session
 
 # Import v1 API router
 from .api.v1 import router as v1_router
 from .core.config import get_settings
 from .core.ratelimit import limiter, rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from fastapi import Request
+from .db import Base, engine, get_db
+from .layer1_speaker import enroll_speaker, verify_speaker
+from .layer2_deepfake import detect_spoof
+from .layer3_adaptive import generate_challenge, get_token_phrase, update_voiceprint, verify_token
+from .layer3_asr import verify_phrase
+from .models import AuthLog, Challenge, User, Voiceprint
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -110,14 +106,14 @@ class ChallengeResponse(BaseModel):
 class VerifyResponse(BaseModel):
     result: str  # "ACCEPT" | "REJECT"
     confidence: float
-    layer_blocked: Optional[int]
+    layer_blocked: int | None
     session_id: str
     reason: str
     l2_label: str
     l2_confidence: float
     l1_score: float
-    asr_transcript: Optional[str] = None
-    asr_similarity: Optional[float] = None
+    asr_transcript: str | None = None
+    asr_similarity: float | None = None
 
 
 class VoiceprintHistory(BaseModel):
@@ -128,13 +124,13 @@ class VoiceprintHistory(BaseModel):
 class AuthLogResponse(BaseModel):
     id: str
     user_id: str
-    l2_label: Optional[str]
+    l2_label: str | None
     l2_confidence: float
     l1_score: float
     result: str
-    layer_blocked: Optional[int]
+    layer_blocked: int | None
     created_at: datetime
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class UserResponse(BaseModel):

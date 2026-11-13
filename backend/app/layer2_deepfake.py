@@ -5,12 +5,12 @@ Note: Modern high-quality TTS (ElevenLabs, etc.) may evade detection
 """
 
 import io
-import torch
+
 import numpy as np
 import soundfile as sf
+import torch
 from scipy import signal
-from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
-from typing import Optional
+from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
 # Model: garystafford/wav2vec2-deepfake-voice-detector
 # Labels: {0: 'real', 1: 'fake'}

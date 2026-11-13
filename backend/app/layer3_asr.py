@@ -3,23 +3,21 @@ Layer 3 — Speech-to-Text (ASR) for Challenge Phrase Verification
 Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expected challenge.
 """
 
+import difflib
 import io
 import os
-import sys
-import tempfile
-import difflib
 import re
-from typing import Tuple
+import sys
 
 # Fix Windows console encoding issues
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
+import numpy as np
+import soundfile as sf
 import torch
 import whisper
-import soundfile as sf
-import numpy as np
 
 # Whisper model - use "base" for good balance of speed/accuracy
 # Options: tiny, base, small, medium, large
@@ -33,7 +31,7 @@ def _get_whisper_model():
     if _whisper_model is None:
         print(f"[L3-ASR] Loading Whisper model: {_MODEL_SIZE}")
         _whisper_model = whisper.load_model(_MODEL_SIZE)
-        print(f"[L3-ASR] Whisper model loaded successfully")
+        print("[L3-ASR] Whisper model loaded successfully")
     return _whisper_model
 
 
@@ -127,7 +125,7 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcript
 
 
-def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> Tuple[bool, float, str]:
+def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
 

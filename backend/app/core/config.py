@@ -3,10 +3,9 @@ AAA Engine Core Configuration
 Centralized configuration management with environment variable support.
 """
 
-import os
-from typing import Optional
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -21,7 +20,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./aaa_engine.db"
 
     # Security - No fallback defaults for secrets in production
-    L3_HMAC_SECRET: Optional[str] = None
+    L3_HMAC_SECRET: str | None = None
 
     # Model Configuration
     WHISPER_MODEL: str = "base"
@@ -48,7 +47,7 @@ class Settings(BaseSettings):
         extra = "ignore"  # Allow unknown env vars to pass through
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()

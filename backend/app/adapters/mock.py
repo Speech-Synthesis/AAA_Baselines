@@ -4,16 +4,15 @@ Deterministic implementations that don't require ML models.
 """
 
 import random
-from typing import Optional
 
 from .base import (
-    SpeakerVerificationAdapter,
-    DeepfakeDetectionAdapter,
     ASRAdapter,
-    SpeakerResult,
-    DeepfakeResult,
     ASRResult,
+    DeepfakeDetectionAdapter,
+    DeepfakeResult,
     ModelInfo,
+    SpeakerResult,
+    SpeakerVerificationAdapter,
 )
 
 
@@ -155,7 +154,7 @@ class MockASRAdapter(ASRAdapter):
 
     def __init__(
         self,
-        default_transcript: Optional[str] = None,
+        default_transcript: str | None = None,
         default_similarity: float = 0.9
     ):
         self._default_transcript = default_transcript

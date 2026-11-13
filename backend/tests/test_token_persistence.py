@@ -3,10 +3,8 @@ AAA Engine Token Persistence Tests
 Tests for database-backed challenge token lifecycle.
 """
 
-import pytest
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
 
 class TestChallengeGeneration:
@@ -124,7 +122,7 @@ class TestTokenVerification:
     def test_expired_token_rejected(self, db_session):
         """Expired token should be rejected."""
         from app.layer3_adaptive import generate_challenge, verify_token
-        from app.models import User, Challenge
+        from app.models import Challenge, User
 
         user = User(id=uuid.uuid4(), name="Test", email=f"test_{uuid.uuid4()}@example.com")
         db_session.add(user)
@@ -203,8 +201,8 @@ class TestTokenCleanup:
 
     def test_cleanup_removes_expired(self, db_session):
         """Cleanup should remove expired tokens."""
-        from app.layer3_adaptive import generate_challenge, cleanup_expired_tokens
-        from app.models import User, Challenge
+        from app.layer3_adaptive import cleanup_expired_tokens, generate_challenge
+        from app.models import Challenge, User
 
         user = User(id=uuid.uuid4(), name="Test", email=f"test_{uuid.uuid4()}@example.com")
         db_session.add(user)
@@ -231,8 +229,8 @@ class TestTokenCleanup:
 
     def test_cleanup_preserves_valid(self, db_session):
         """Cleanup should preserve valid tokens."""
-        from app.layer3_adaptive import generate_challenge, cleanup_expired_tokens
-        from app.models import User, Challenge
+        from app.layer3_adaptive import cleanup_expired_tokens, generate_challenge
+        from app.models import Challenge, User
 
         user = User(id=uuid.uuid4(), name="Test", email=f"test_{uuid.uuid4()}@example.com")
         db_session.add(user)
@@ -282,14 +280,14 @@ class TestTokenHelperFunctions:
 
     def test_returns_none_for_invalid(self, db_session):
         """Should return None for invalid tokens."""
-        from app.layer3_adaptive import get_token_user_id, get_token_phrase
+        from app.layer3_adaptive import get_token_phrase, get_token_user_id
 
         assert get_token_user_id("fake-token", db_session) is None
         assert get_token_phrase("fake-token", db_session) is None
 
     def test_returns_none_without_db(self):
         """Should return None without database session."""
-        from app.layer3_adaptive import get_token_user_id, get_token_phrase
+        from app.layer3_adaptive import get_token_phrase, get_token_user_id
 
         assert get_token_user_id("any-token", None) is None
         assert get_token_phrase("any-token", None) is None

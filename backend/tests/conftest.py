@@ -4,6 +4,7 @@ Pytest Configuration and Fixtures
 
 import os
 import sys
+
 import pytest
 
 # Add backend/app to path for imports
@@ -32,9 +33,9 @@ def client(app):
 @pytest.fixture(scope="function")
 def db_session():
     """Create a fresh database session for each test."""
-    from app.db import SessionLocal, engine, Base
     # Import models to ensure they're registered with Base
     from app import models  # noqa: F401
+    from app.db import Base, SessionLocal, engine
 
     # Drop and recreate all tables for fresh schema
     Base.metadata.drop_all(bind=engine)

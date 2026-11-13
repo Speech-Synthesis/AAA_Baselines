@@ -5,7 +5,6 @@ Abstract interfaces for model integration.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -21,7 +20,7 @@ class ModelInfo:
 class SpeakerResult:
     """Result from speaker verification."""
     embedding: list[float]
-    score: Optional[float] = None  # Similarity score if comparing
+    score: float | None = None  # Similarity score if comparing
     is_match: bool = False
 
 
@@ -38,7 +37,7 @@ class ASRResult:
     """Result from speech recognition."""
     transcript: str
     confidence: float
-    similarity: Optional[float] = None  # If comparing to expected phrase
+    similarity: float | None = None  # If comparing to expected phrase
 
 
 class ModelAdapter(ABC):

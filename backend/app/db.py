@@ -5,9 +5,10 @@ SQLAlchemy engine and session management
 
 import os
 from pathlib import Path
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Load .env from project root (parent of backend/)
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"

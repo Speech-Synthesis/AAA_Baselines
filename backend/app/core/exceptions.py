@@ -3,7 +3,6 @@ AAA Engine Custom Exceptions
 Typed exceptions for consistent error handling.
 """
 
-from typing import Optional
 
 
 class AAAEngineError(Exception):
@@ -98,7 +97,7 @@ class ModelTimeoutError(ModelError):
 # Validation Errors
 class ValidationError(AAAEngineError):
     """Input validation failed."""
-    def __init__(self, message: str, field: Optional[str] = None):
+    def __init__(self, message: str, field: str | None = None):
         super().__init__(message, "validation_error")
         self.field = field
 
