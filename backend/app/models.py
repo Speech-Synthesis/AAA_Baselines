@@ -3,10 +3,21 @@ ORM Models - Navadeep
 Database-agnostic models supporting both SQLite and PostgreSQL
 """
 
-import uuid
 import json
+import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Integer, Float, Boolean, DateTime, ForeignKey, TypeDecorator
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+)
 from sqlalchemy.orm import relationship
 
 from .db import Base

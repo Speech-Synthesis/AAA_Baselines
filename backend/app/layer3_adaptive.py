@@ -3,14 +3,21 @@ Layer 3 — Challenge-Response + EMA - Aditya
 Handles dynamic challenges, HMAC-signed token verification with 90s TTL,
 single-use enforcement, and adaptive EMA voiceprint updates.
 """
+# ruff: noqa: S311 - random.choice is intentional for non-cryptographic phrase generation
 
-import os
-import secrets
-import hmac
 import hashlib
+import hmac
+import os
 import random
+import secrets
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import TYPE_CHECKING
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    pass
 
 # Secret key for HMAC token signing (MUST be set via environment variable)
 _hmac_secret = os.environ.get("L3_HMAC_SECRET")
@@ -21,9 +28,10 @@ if not _hmac_secret:
     if os.environ.get("DEBUG", "").lower() in ("true", "1", "yes"):
         warnings.warn(
             "L3_HMAC_SECRET not set - using insecure default for DEBUG mode only",
-            RuntimeWarning
+            RuntimeWarning,
+            stacklevel=2
         )
-        _hmac_secret = "INSECURE_DEBUG_SECRET_DO_NOT_USE_IN_PRODUCTION"
+        _hmac_secret = "INSECURE_DEBUG_SECRET_DO_NOT_USE_IN_PRODUCTION"  # noqa: S105
     else:
         from .core.exceptions import MissingSecretError
         raise MissingSecretError("L3_HMAC_SECRET environment variable must be set")
@@ -207,11 +215,8 @@ def _generate_dynamic_phrase() -> str:
 # Replaces in-memory storage for production reliability
 # =============================================================================
 
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
-
-def generate_challenge(user_id: str, db: Session = None) -> dict:
+def generate_challenge(user_id: str, db: Session | None = None) -> dict:
     """
     Generate a dynamic challenge phrase and single-use HMAC-SHA256 signed token with 90s TTL.
 
@@ -248,8 +253,9 @@ def generate_challenge(user_id: str, db: Session = None) -> dict:
 
     # Persist to database if session provided
     if db is not None:
-        from .models import Challenge
         import uuid
+
+        from .models import Challenge
 
         challenge = Challenge(
             id=uuid.uuid4(),
@@ -328,7 +334,7 @@ def verify_token(token: str, db: Session = None) -> bool:
     return True
 
 
-def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
+def validate_and_consume_token(token: str, db: Session) -> dict | None:
     """
     Atomically validate and consume a challenge token.
 
@@ -392,7 +398,7 @@ def validate_and_consume_token(token: str, db: Session) -> Optional[dict]:
     }
 
 
-def get_token_user_id(token: str, db: Session = None) -> Optional[str]:
+def get_token_user_id(token: str, db: Session = None) -> str | None:
     """Get the user_id associated with a token."""
     if not token:
         return None
@@ -407,7 +413,7 @@ def get_token_user_id(token: str, db: Session = None) -> Optional[str]:
     return None
 
 
-def get_token_phrase(token: str, db: Session = None) -> Optional[str]:
+def get_token_phrase(token: str, db: Session = None) -> str | None:
     """Get the challenge phrase associated with a token."""
     if not token:
         return None
@@ -475,7 +481,7 @@ def update_voiceprint(
     # Calculate elementwise: 0.8 * old + 0.2 * current
     updated = [
         (1.0 - alpha) * old_val + alpha * new_val
-        for old_val, new_val in zip(old_embedding, new_embedding)
+        for old_val, new_val in zip(old_embedding, new_embedding, strict=True)
     ]
 
     return updated

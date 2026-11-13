@@ -3,19 +3,20 @@ AAA Engine Health and Readiness Endpoints
 """
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, Response
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from ...core.config import validate_production_config
 from ...db import get_db
-from ...core.config import get_settings, validate_production_config
 from ...schemas.common import (
+    CheckStatus,
     HealthResponse,
-    ReadinessResponse,
-    ReadinessChecks,
     ModelChecks,
     ModelStatus,
-    CheckStatus,
+    ReadinessChecks,
+    ReadinessResponse,
 )
 
 router = APIRouter()

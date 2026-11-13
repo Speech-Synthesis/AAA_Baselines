@@ -3,7 +3,7 @@ ECAPA-TDNN Speaker Verification Adapter
 Wraps the existing layer1_speaker module.
 """
 
-from .base import SpeakerVerificationAdapter, SpeakerResult, ModelInfo
+from .base import ModelInfo, SpeakerResult, SpeakerVerificationAdapter
 
 
 class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
@@ -32,7 +32,6 @@ class EcapaSpeakerAdapter(SpeakerVerificationAdapter):
     def load(self) -> bool:
         """Load the model (delegated to layer1_speaker on first use)."""
         try:
-            from ..layer1_speaker import enroll_speaker
             # Trigger model loading by calling with minimal audio
             # The actual model is lazily loaded in layer1_speaker
             self._loaded = True

@@ -32,7 +32,6 @@ class Wav2VecDeepfakeAdapter(DeepfakeDetectionAdapter):
     def load(self) -> bool:
         """Load the model (delegated to layer2_deepfake on first use)."""
         try:
-            from ..layer2_deepfake import detect_spoof
             self._loaded = True
             return True
         except Exception:

@@ -32,7 +32,6 @@ class WhisperASRAdapter(ASRAdapter):
     def load(self) -> bool:
         """Load the model (delegated to layer3_asr on first use)."""
         try:
-            from ..layer3_asr import verify_phrase
             self._loaded = True
             return True
         except Exception:

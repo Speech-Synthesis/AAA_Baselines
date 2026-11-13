@@ -3,9 +3,8 @@ AAA Engine Day 1 Foundation Tests
 Tests for core infrastructure implemented on November 11, 2026.
 """
 
+
 import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock
 
 
 class TestHealthEndpoint:
@@ -136,7 +135,7 @@ class TestSchemas:
 
     def test_readiness_response_schema(self):
         """ReadinessResponse should have all fields."""
-        from app.schemas.common import ReadinessResponse, ReadinessChecks
+        from app.schemas.common import ReadinessResponse
         response = ReadinessResponse()
         assert response.status == "not_ready"
         assert response.checks is not None
@@ -186,7 +185,6 @@ class TestSecretConfiguration:
         """Missing L3_HMAC_SECRET should raise error in production mode."""
         import os
         import sys
-        import importlib
 
         # Save original values
         orig_debug = os.environ.get("DEBUG")
@@ -205,7 +203,7 @@ class TestSecretConfiguration:
             # Import should raise MissingSecretError
             from app.core.exceptions import MissingSecretError
             with pytest.raises(MissingSecretError):
-                import app.layer3_adaptive
+                import app.layer3_adaptive  # noqa: F401
         finally:
             # Restore original values
             if orig_debug is not None:
@@ -241,6 +239,7 @@ class TestDefaultDenyBehavior:
 def client():
     """Create test client."""
     from fastapi.testclient import TestClient
+
     from app.main import app
     return TestClient(app)
 

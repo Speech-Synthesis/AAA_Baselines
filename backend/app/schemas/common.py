@@ -3,11 +3,12 @@ AAA Engine Common Schemas
 Shared Pydantic models for API requests and responses.
 """
 
+import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any
+
 from pydantic import BaseModel, Field
-import uuid
 
 
 class Decision(str, Enum):
@@ -74,8 +75,8 @@ class ErrorResponse(BaseModel):
     """Standard error response."""
     error: str
     message: str
-    request_id: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    request_id: str | None = None
+    details: dict[str, Any] | None = None
 
 
 # Common Request/Response Fields

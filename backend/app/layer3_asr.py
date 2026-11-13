@@ -32,6 +32,8 @@ if sys.platform == 'win32':
     except (AttributeError, io.UnsupportedOperation, OSError):  # noqa: S110
         pass
 
+# Whisper model - use "base" for good balance of speed/accuracy
+# Options: tiny, base, small, medium, large
 _MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
 _whisper_model = None
 

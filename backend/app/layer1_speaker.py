@@ -4,9 +4,10 @@ Uses speechbrain/spkrec-ecapa-voxceleb for 192-dim embeddings
 """
 
 import io
-import torch
-import soundfile as sf
+
 import numpy as np
+import soundfile as sf
+import torch
 from scipy import signal
 from speechbrain.inference.speaker import EncoderClassifier
 from speechbrain.utils.fetching import LocalStrategy
