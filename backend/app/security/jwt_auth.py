@@ -150,7 +150,7 @@ _MOCK_API_CLIENTS: dict[str, dict[str, Any]] = {
     },
     "callguard-agent": {
         "secret_hash": hashlib.sha256(b"callguard-telecom-perimeter-secret-key-9988").hexdigest(),
-        "allowed_tenants": ["telco-omega-99", "tenant-test-default"],
+        "allowed_tenants": ["telco-omega-99", "callcentre_demo", "tenant-test-default"],
     },
     "test-client-id": {
         "secret_hash": hashlib.sha256(b"test-client-secret-key-32-characters-long!!").hexdigest(),
