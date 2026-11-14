@@ -4,19 +4,8 @@ Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expecte
 Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase matcher.
 """
 
-import difflib
-import io
-import os
-import re
-import sys
-
-# Fix Windows console encoding issues
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from __future__ import annotations
 
-import difflib
 import io
 import os
 import sys
@@ -27,19 +16,15 @@ import torch
 import whisper
 
 # Integration with approved AAA-ASR deterministic phrase matcher
-from .aaa_asr.phrase_matcher import (
-    normalize_text as aaa_normalize_text,
-)
-from .aaa_asr.phrase_matcher import (
-    verify_phrase as aaa_verify_phrase,
-)
+from .aaa_asr.phrase_matcher import normalize_text as aaa_normalize_text
+from .aaa_asr.phrase_matcher import verify_phrase as aaa_verify_phrase
 
 # Fix Windows console encoding issues
-if sys.platform == 'win32':
+if sys.platform == "win32":
     try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except (AttributeError, io.UnsupportedOperation, OSError):  # noqa: S110
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, io.UnsupportedOperation, OSError):
         pass
 
 # Whisper model - use "base" for good balance of speed/accuracy
@@ -58,36 +43,6 @@ def _get_whisper_model():
     return _whisper_model
 
 
-def _normalize_text(text: str) -> str:
-    """
-    Normalize text for comparison using approved AAA-ASR normalizer.
-    """
-    text = text.lower().strip()
-    # Remove punctuation
-    text = re.sub(r"[^\w\s]", "", text)
-    # Collapse whitespace
-    text = re.sub(r"\s+", " ", text)
-
-    # Normalize numbers: convert words to digits for consistent comparison
-    number_map = {
-        "zero": "0",
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-    }
-    for word, digit in number_map.items():
-        text = re.sub(rf"\b{word}\b", digit, text)
-
-    return text
-    return aaa_normalize_text(text)
-
-
 def _extract_phrase_content(challenge_phrase: str) -> str:
     """
     Extract the content to match from challenge phrase.
@@ -97,14 +52,6 @@ def _extract_phrase_content(challenge_phrase: str) -> str:
     if phrase.lower().startswith("say:"):
         phrase = phrase[4:].strip()
     return aaa_normalize_text(phrase)
-
-
-def _calculate_similarity(text1: str, text2: str) -> float:
-    """
-    Calculate similarity ratio between two texts.
-    Kept for diagnostic reporting only; NOT used for authentication decision.
-    """
-    return difflib.SequenceMatcher(None, text1, text2).ratio()
 
 
 def transcribe_audio(audio_bytes: bytes) -> str:
@@ -153,7 +100,6 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 def verify_phrase(
     audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
 ) -> tuple[bool, float, str]:
-def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
     Updated for Day 1: Uses deterministic exact matching after safe normalization.
@@ -172,10 +118,7 @@ def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0
         transcribed = transcribe_audio(audio_bytes)
 
         # Use approved deterministic exact-match phrase verifier
-        result = aaa_verify_phrase(
-            expected=expected_phrase,
-            transcript=transcribed
-        )
+        result = aaa_verify_phrase(expected=expected_phrase, transcript=transcribed)
 
         # In deterministic mode: 1.0 for exact match, 0.0 for mismatch
         score = 1.0 if result.match else 0.0
