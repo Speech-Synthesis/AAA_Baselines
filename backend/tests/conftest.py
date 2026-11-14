@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["DEBUG"] = "true"
 os.environ["DATABASE_URL"] = "sqlite:///./test_aaa_engine.db"
 os.environ["L3_HMAC_SECRET"] = "test-hmac-secret-for-testing-only"
+os.environ["AAA_JWT_SECRET"] = "9f8e4d2a1b7c6e5f3a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f"
 
 
 @pytest.fixture(scope="session")

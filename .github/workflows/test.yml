@@ -49,6 +49,7 @@ jobs:
       - name: Run tests (SQLite)
         env:
           L3_HMAC_SECRET: test-secret-for-ci-do-not-use-in-production
+          AAA_JWT_SECRET: 9f8e4d2a1b7c6e5f3a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f
           DEBUG: "true"
           DATABASE_URL: sqlite:///./test_aaa_engine.db
         run: |
@@ -58,6 +59,7 @@ jobs:
       - name: Run tests (PostgreSQL)
         env:
           L3_HMAC_SECRET: test-secret-for-ci-do-not-use-in-production
+          AAA_JWT_SECRET: 9f8e4d2a1b7c6e5f3a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f
           DEBUG: "true"
           DATABASE_URL: postgresql://test:test@localhost:5432/aaa_engine_test
         run: |
