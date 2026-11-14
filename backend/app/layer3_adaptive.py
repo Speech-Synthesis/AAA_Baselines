@@ -3,6 +3,7 @@ Layer 3 — Challenge-Response + EMA - Aditya
 Handles dynamic challenges, HMAC-signed token verification with 90s TTL,
 single-use enforcement, and adaptive EMA voiceprint updates.
 """
+# ruff: noqa: S311 - random.choice is intentional for non-cryptographic phrase generation
 
 import hashlib
 import hmac
@@ -557,7 +558,7 @@ def _generate_dynamic_phrase() -> str:
 # =============================================================================
 
 
-def generate_challenge(user_id: str, db: Session = None) -> dict:
+def generate_challenge(user_id: str, db: Session | None = None) -> dict:
     """
     Generate a dynamic challenge phrase and single-use HMAC-SHA256 signed token with 90s TTL.
 

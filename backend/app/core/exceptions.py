@@ -4,6 +4,7 @@ Typed exceptions for consistent error handling.
 """
 
 
+
 class AAAEngineError(Exception):
     """Base exception for AAA Engine."""
 

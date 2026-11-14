@@ -4,6 +4,7 @@ Tests for mock and base adapter functionality.
 """
 
 
+
 class TestMockSpeakerAdapter:
     """Tests for MockSpeakerAdapter."""
 

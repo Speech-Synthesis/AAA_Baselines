@@ -1,0 +1,45 @@
+{
+  "experiment": "Experiment 2 \u2014 Frozen Audio Encoder v1.2",
+  "governance": {
+    "test_evaluation_count": 2,
+    "notes": "Experiment 1 recorded baseline zero-shot test evaluation. Experiment 2 evaluates the fine-tuned model as subsequent evaluation. Test split was strictly held out from training and checkpoint selection."
+  },
+  "training_dynamics": {
+    "total_steps_planned": 291,
+    "successful_optimizer_updates": 287,
+    "skipped_optimizer_updates": 4
+  },
+  "checkpoints": {
+    "zero_shot_baseline": "whisper_base_zero_shot_baseline.pt",
+    "best_fine_tuned": "whisper_base_public_best.pt",
+    "final_epoch": "whisper_base_public_final.pt"
+  },
+  "validation": {
+    "zero_shot_baseline_wer": 6.0,
+    "best_fine_tuned_wer": 6.0
+  },
+  "calibration": {
+    "wer": 6.69,
+    "cer": 2.38,
+    "exact_phrase_accuracy": 46.15,
+    "total": 299,
+    "mean_avg_logprob": -0.0963,
+    "mean_confidence": 0.9082,
+    "high_confidence_ratio": 99.33
+  },
+  "held_out_test_comparison": {
+    "baseline_test_metrics": {
+      "wer": 6.7,
+      "cer": 2.8,
+      "exact_phrase_accuracy": 47.07,
+      "total": 427
+    },
+    "finetuned_test_metrics": {
+      "wer": 6.66,
+      "cer": 2.39,
+      "exact_phrase_accuracy": 44.73,
+      "total": 427
+    },
+    "wer_delta": -0.04
+  }
+}

@@ -6,12 +6,13 @@ Shared Pydantic models for API requests and responses.
 import uuid
 from datetime import datetime
 from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class Decision(str, Enum):
+class Decision(StrEnum):
     """Authentication decision outcomes."""
 
     APPROVE = "APPROVE"
@@ -21,7 +22,7 @@ class Decision(str, Enum):
     UNAVAILABLE = "UNAVAILABLE"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk assessment levels."""
 
     LOW = "LOW"
@@ -30,7 +31,7 @@ class RiskLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class ModelStatus(str, Enum):
+class ModelStatus(StrEnum):
     """Model availability status."""
 
     OK = "ok"
@@ -39,7 +40,7 @@ class ModelStatus(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
-class CheckStatus(str, Enum):
+class CheckStatus(StrEnum):
     """Readiness check status."""
 
     OK = "ok"

@@ -1,6 +1,7 @@
 """
 Layer 3 — Speech-to-Text (ASR) for Challenge Phrase Verification
 Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expected challenge.
+Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase matcher.
 """
 
 import difflib
@@ -13,11 +14,33 @@ import sys
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+from __future__ import annotations
+
+import difflib
+import io
+import os
+import sys
 
 import numpy as np
 import soundfile as sf
 import torch
 import whisper
+
+# Integration with approved AAA-ASR deterministic phrase matcher
+from .aaa_asr.phrase_matcher import (
+    normalize_text as aaa_normalize_text,
+)
+from .aaa_asr.phrase_matcher import (
+    verify_phrase as aaa_verify_phrase,
+)
+
+# Fix Windows console encoding issues
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, io.UnsupportedOperation, OSError):  # noqa: S110
+        pass
 
 # Whisper model - use "base" for good balance of speed/accuracy
 # Options: tiny, base, small, medium, large
@@ -37,11 +60,7 @@ def _get_whisper_model():
 
 def _normalize_text(text: str) -> str:
     """
-    Normalize text for comparison:
-    - Lowercase
-    - Remove punctuation
-    - Collapse whitespace
-    - Convert number words to digits and vice versa
+    Normalize text for comparison using approved AAA-ASR normalizer.
     """
     text = text.lower().strip()
     # Remove punctuation
@@ -66,6 +85,7 @@ def _normalize_text(text: str) -> str:
         text = re.sub(rf"\b{word}\b", digit, text)
 
     return text
+    return aaa_normalize_text(text)
 
 
 def _extract_phrase_content(challenge_phrase: str) -> str:
@@ -76,13 +96,13 @@ def _extract_phrase_content(challenge_phrase: str) -> str:
     phrase = challenge_phrase.strip()
     if phrase.lower().startswith("say:"):
         phrase = phrase[4:].strip()
-    return _normalize_text(phrase)
+    return aaa_normalize_text(phrase)
 
 
 def _calculate_similarity(text1: str, text2: str) -> float:
     """
     Calculate similarity ratio between two texts.
-    Returns value between 0.0 (no match) and 1.0 (exact match).
+    Kept for diagnostic reporting only; NOT used for authentication decision.
     """
     return difflib.SequenceMatcher(None, text1, text2).ratio()
 
@@ -133,13 +153,16 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 def verify_phrase(
     audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
 ) -> tuple[bool, float, str]:
+def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
+    Updated for Day 1: Uses deterministic exact matching after safe normalization.
+    No fuzzy SequenceMatcher acceptance in the authentication path.
 
     Args:
         audio_bytes: Raw WAV audio bytes
         expected_phrase: The challenge phrase the user should speak
-        threshold: Minimum similarity score to accept (0.0-1.0)
+        threshold: Ignored for authentication (exact match required); preserved for backward compatibility.
 
     Returns:
         Tuple of (is_match, similarity_score, transcribed_text)
@@ -148,23 +171,17 @@ def verify_phrase(
         # Transcribe the audio
         transcribed = transcribe_audio(audio_bytes)
 
-        # Normalize both texts for comparison
-        expected_normalized = _extract_phrase_content(expected_phrase)
-        transcribed_normalized = _normalize_text(transcribed)
+        # Use approved deterministic exact-match phrase verifier
+        result = aaa_verify_phrase(
+            expected=expected_phrase,
+            transcript=transcribed
+        )
 
-        try:
-            print(f"[L3-ASR] Expected (normalized): '{expected_normalized}'")
-            print(f"[L3-ASR] Transcribed (normalized): '{transcribed_normalized}'")
-        except UnicodeEncodeError:
-            print("[L3-ASR] (Unicode print error - continuing)")
+        # In deterministic mode: 1.0 for exact match, 0.0 for mismatch
+        score = 1.0 if result.match else 0.0
+        print(f"[L3-ASR] Deterministic result: {result.code} (match={result.match})")
 
-        # Calculate similarity
-        similarity = _calculate_similarity(expected_normalized, transcribed_normalized)
-        print(f"[L3-ASR] Phrase similarity: {similarity:.3f} (threshold: {threshold})")
-
-        is_match = similarity >= threshold
-
-        return is_match, similarity, transcribed
+        return result.match, score, transcribed
 
     except Exception as e:
         print(f"[L3-ASR] Error during transcription: {e}")
