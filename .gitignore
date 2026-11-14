@@ -52,3 +52,6 @@ ISSUES_TODO.md
 # Test databases
 *.db
 test_*.db
+
+# Personal reports (not to be committed)
+/local_reports/surya/
