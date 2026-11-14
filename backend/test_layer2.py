@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import torch
 import torchaudio
 
 # Add backend/app to path to import layer2_deepfake
@@ -31,7 +32,7 @@ def generate_synthetic_audio(duration_s=3, frequency=440, sample_rate=16000, aud
     Returns:
         bytes: WAV audio data
     """
-    import torch
+    import torch  # noqa: F401
 
     num_samples = int(duration_s * sample_rate)
     t = np.linspace(0, duration_s, num_samples)
@@ -42,10 +43,10 @@ def generate_synthetic_audio(duration_s=3, frequency=440, sample_rate=16000, aud
     elif audio_type == "complex":
         # Multi-frequency to simulate more realistic speech-like audio
         waveform = (
-            0.5 * np.sin(2 * np.pi * 200 * t) +      # Low frequency (fundamental)
-            0.3 * np.sin(2 * np.pi * 440 * t) +       # Mid frequency
-            0.2 * np.sin(2 * np.pi * 880 * t) +       # Higher frequency
-            0.1 * np.sin(2 * np.pi * 1760 * t)        # Even higher
+            0.5 * np.sin(2 * np.pi * 200 * t)  # Low frequency (fundamental)
+            + 0.3 * np.sin(2 * np.pi * 440 * t)  # Mid frequency
+            + 0.2 * np.sin(2 * np.pi * 880 * t)  # Higher frequency
+            + 0.1 * np.sin(2 * np.pi * 1760 * t)  # Even higher
         )
         waveform = waveform / np.max(np.abs(waveform))  # Normalize
     else:
@@ -68,7 +69,7 @@ def generate_synthetic_audio(duration_s=3, frequency=440, sample_rate=16000, aud
 
 def load_wav_file(filepath):
     """Load a WAV file and return as bytes."""
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         return f.read()
 
 
@@ -100,7 +101,7 @@ def test_layer2():
     # Test 2: Synthetic spoof-like audio (high-frequency chirp, less natural)
     print("\n[Test 2] Generating synthetic spoof-like audio (3s high-freq chirp)...")
     try:
-        import torch
+        import torch  # noqa: F401
 
         # Create a chirp signal (frequency-modulated, less natural sounding)
         duration_s = 3
@@ -141,7 +142,9 @@ def test_layer2():
             print(f"✗ Failed: {e}")
     else:
         print(f"\n[Test 3] Real bonafide sample not found at {bonafide_file}")
-        print("        (Create AAA_Baselines/sample_audio/bonafide_sample.wav to test with real audio)")
+        print(
+            "        (Create AAA_Baselines/sample_audio/bonafide_sample.wav to test with real audio)"
+        )
 
     if spoof_file.exists():
         print(f"\n[Test 4] Loading real spoof sample from {spoof_file}...")
@@ -153,7 +156,9 @@ def test_layer2():
             print(f"✗ Failed: {e}")
     else:
         print(f"\n[Test 4] Real spoof sample not found at {spoof_file}")
-        print("        (Create AAA_Baselines/sample_audio/spoof_sample.wav to test with real audio)")
+        print(
+            "        (Create AAA_Baselines/sample_audio/spoof_sample.wav to test with real audio)"
+        )
 
     # Run detection on all test cases
     print("\n" + "=" * 70)
@@ -183,6 +188,7 @@ def test_layer2():
         except Exception as e:
             print(f"  ✗ Error: {e}")
             import traceback
+
             traceback.print_exc()
 
     print("\n" + "=" * 70)
@@ -201,8 +207,9 @@ def test_layer2():
 
 if __name__ == "__main__":
     try:
-        # Need to import torch after sys.path is modified
+        # Need to import torch  # noqa: F401 after sys.path is modified
         import torch  # noqa: F401
+
         test_layer2()
     except ImportError as e:
         print(f"Error: Missing dependency: {e}")

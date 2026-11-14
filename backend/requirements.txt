@@ -31,6 +31,8 @@ python-dotenv>=1.0.0
 pydantic>=2.5.0
 pydantic-settings>=2.0.0
 huggingface-hub>=0.20.0
+python-jose[cryptography]>=3.3.0
+cryptography>=41.0.0
 
 # Rate limiting
 slowapi>=0.1.9

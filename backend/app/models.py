@@ -27,6 +27,7 @@ class GUID(TypeDecorator):
     """Platform-independent GUID type.
     Uses String(36) for SQLite and native UUID for PostgreSQL.
     """
+
     impl = String(36)
     cache_ok = True
 
@@ -45,6 +46,7 @@ class JSONEncodedList(TypeDecorator):
     """Stores a list as a JSON-encoded string.
     Works with both SQLite and PostgreSQL.
     """
+
     impl = Text
     cache_ok = True
 

@@ -40,9 +40,7 @@ class TestChallengeGeneration:
         assert "challenge_id" in result
 
         # Verify in database
-        challenge = db_session.query(Challenge).filter(
-            Challenge.token == result["token"]
-        ).first()
+        challenge = db_session.query(Challenge).filter(Challenge.token == result["token"]).first()
         assert challenge is not None
         assert challenge.phrase == result["phrase"]
         assert challenge.used is False
@@ -131,9 +129,7 @@ class TestTokenVerification:
         result = generate_challenge(str(user.id), db_session)
 
         # Manually expire the token
-        challenge = db_session.query(Challenge).filter(
-            Challenge.token == result["token"]
-        ).first()
+        challenge = db_session.query(Challenge).filter(Challenge.token == result["token"]).first()
         challenge.expires_at = datetime.utcnow() - timedelta(seconds=1)
         db_session.commit()
 
@@ -210,9 +206,7 @@ class TestTokenCleanup:
 
         # Create a challenge and expire it
         result = generate_challenge(str(user.id), db_session)
-        challenge = db_session.query(Challenge).filter(
-            Challenge.token == result["token"]
-        ).first()
+        challenge = db_session.query(Challenge).filter(Challenge.token == result["token"]).first()
         challenge.expires_at = datetime.utcnow() - timedelta(seconds=100)
         db_session.commit()
 
@@ -222,9 +216,7 @@ class TestTokenCleanup:
         assert deleted >= 1
 
         # Verify it's gone
-        remaining = db_session.query(Challenge).filter(
-            Challenge.token == result["token"]
-        ).first()
+        remaining = db_session.query(Challenge).filter(Challenge.token == result["token"]).first()
         assert remaining is None
 
     def test_cleanup_preserves_valid(self, db_session):
@@ -243,9 +235,7 @@ class TestTokenCleanup:
         cleanup_expired_tokens(db_session)
 
         # Valid token should still exist
-        remaining = db_session.query(Challenge).filter(
-            Challenge.token == result["token"]
-        ).first()
+        remaining = db_session.query(Challenge).filter(Challenge.token == result["token"]).first()
         assert remaining is not None
 
 

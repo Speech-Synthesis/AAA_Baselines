@@ -39,7 +39,7 @@ settings = get_settings()
 app = FastAPI(
     title="AAA Engine",
     description="Adaptive Audio Authentication with Deepfake Detection",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Rate limiting
@@ -53,14 +53,16 @@ app.include_router(v1_router)
 # Note: Wildcard patterns preserved for backward compatibility
 # TODO: Restrict to specific origins in production
 cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else []
-cors_origins.extend([
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:3000",
-    "https://aaa-frontend.onrender.com",
-    "https://*.onrender.com",
-    "https://*.hf.space"
-])
+cors_origins.extend(
+    [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "https://aaa-frontend.onrender.com",
+        "https://*.onrender.com",
+        "https://*.hf.space",
+    ]
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -82,6 +84,7 @@ ASR_PHRASE_THRESHOLD = settings.ASR_PHRASE_THRESHOLD
 
 
 # === Request/Response Models ===
+
 
 class RegisterRequest(BaseModel):
     name: str
@@ -143,6 +146,7 @@ class UserResponse(BaseModel):
 
 # === Routes ===
 
+
 @app.get("/")
 async def root():
     return {"message": "AAA Engine API", "status": "running"}
@@ -156,13 +160,15 @@ async def get_all_users(db: Session = Depends(get_db)):
     result = []
     for user in users:
         voiceprint = db.query(Voiceprint).filter(Voiceprint.user_id == user.id).first()
-        result.append(UserResponse(
-            id=str(user.id),
-            name=user.name,
-            email=user.email,
-            created_at=user.created_at,
-            has_voiceprint=voiceprint is not None
-        ))
+        result.append(
+            UserResponse(
+                id=str(user.id),
+                name=user.name,
+                email=user.email,
+                created_at=user.created_at,
+                has_voiceprint=voiceprint is not None,
+            )
+        )
     return result
 
 
@@ -188,7 +194,7 @@ async def enroll(
     request: Request,
     user_id: str = Form(...),
     audio: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Enroll user's voice (create/update voiceprint)."""
     # Validate user exists
@@ -214,11 +220,7 @@ async def enroll(
         voiceprint.updated_at = datetime.utcnow()
     else:
         # Create new voiceprint
-        voiceprint = Voiceprint(
-            user_id=uuid.UUID(user_id),
-            embedding=embedding,
-            sample_count=1
-        )
+        voiceprint = Voiceprint(user_id=uuid.UUID(user_id), embedding=embedding, sample_count=1)
         db.add(voiceprint)
 
     db.commit()
@@ -229,11 +231,7 @@ async def enroll(
 
 @app.get("/auth/challenge", response_model=ChallengeResponse)
 @limiter.limit(settings.RATE_LIMIT_CHALLENGES)
-async def get_challenge(
-    request: Request,
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
-):
+async def get_challenge(request: Request, user_id: str = Query(...), db: Session = Depends(get_db)):
     """Generate a challenge phrase for authentication."""
     # Validate user exists and has voiceprint
     user = db.query(User).filter(User.id == user_id).first()
@@ -252,7 +250,7 @@ async def get_challenge(
         user_id=uuid.UUID(user_id),
         phrase=challenge_data["phrase"],
         token=challenge_data["token"],
-        expires_at=challenge_data["expires_at"]
+        expires_at=challenge_data["expires_at"],
     )
     db.add(challenge)
     db.commit()
@@ -267,7 +265,7 @@ async def verify(
     user_id: str = Form(...),
     token: str = Form(...),
     audio: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Verify user's voice against challenge.
@@ -301,7 +299,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=0.0,
             result="REJECT",
-            layer_blocked=2
+            layer_blocked=2,
         )
         db.add(log)
         db.commit()
@@ -314,7 +312,7 @@ async def verify(
             reason="Deepfake/spoof detected",
             l2_label=l2_label,
             l2_confidence=l2_confidence,
-            l1_score=0.0
+            l1_score=0.0,
         )
 
     # === LAYER 3A: ASR Phrase Verification (before speaker check) ===
@@ -331,7 +329,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=0.0,
             result="REJECT",
-            layer_blocked=4  # Layer 4 = ASR phrase mismatch
+            layer_blocked=4,  # Layer 4 = ASR phrase mismatch
         )
         db.add(log)
         db.commit()
@@ -346,7 +344,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=0.0,
             asr_transcript=asr_transcript,
-            asr_similarity=asr_similarity
+            asr_similarity=asr_similarity,
         )
 
     # === LAYER 1: Speaker Verification ===
@@ -362,7 +360,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=l1_score,
             result="REJECT",
-            layer_blocked=1
+            layer_blocked=1,
         )
         db.add(log)
         db.commit()
@@ -377,7 +375,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=l1_score,
             asr_transcript=asr_transcript,
-            asr_similarity=asr_similarity
+            asr_similarity=asr_similarity,
         )
 
     # === LAYER 3B: Token Verification ===
@@ -389,7 +387,7 @@ async def verify(
             l2_confidence=l2_confidence,
             l1_score=l1_score,
             result="REJECT",
-            layer_blocked=3
+            layer_blocked=3,
         )
         db.add(log)
         db.commit()
@@ -402,7 +400,7 @@ async def verify(
             reason="Invalid or expired token",
             l2_label=l2_label,
             l2_confidence=l2_confidence,
-            l1_score=l1_score
+            l1_score=l1_score,
         )
 
     # Mark challenge as used in database
@@ -424,7 +422,7 @@ async def verify(
         l2_confidence=l2_confidence,
         l1_score=l1_score,
         result="ACCEPT",
-        layer_blocked=None
+        layer_blocked=None,
     )
     db.add(log)
     db.commit()
@@ -439,7 +437,7 @@ async def verify(
         l2_confidence=l2_confidence,
         l1_score=l1_score,
         asr_transcript=asr_transcript,
-        asr_similarity=asr_similarity
+        asr_similarity=asr_similarity,
     )
 
 
@@ -450,9 +448,12 @@ async def voiceprint_history(user_id: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    voiceprints = db.query(Voiceprint).filter(
-        Voiceprint.user_id == user_id
-    ).order_by(Voiceprint.updated_at.desc()).all()
+    voiceprints = (
+        db.query(Voiceprint)
+        .filter(Voiceprint.user_id == user_id)
+        .order_by(Voiceprint.updated_at.desc())
+        .all()
+    )
 
     return [
         VoiceprintHistory(updated_at=vp.updated_at, sample_count=vp.sample_count)
@@ -467,9 +468,13 @@ async def get_auth_logs(user_id: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    logs = db.query(AuthLog).filter(
-        AuthLog.user_id == user_id
-    ).order_by(AuthLog.created_at.desc()).limit(50).all()
+    logs = (
+        db.query(AuthLog)
+        .filter(AuthLog.user_id == user_id)
+        .order_by(AuthLog.created_at.desc())
+        .limit(50)
+        .all()
+    )
 
     # Map layer_blocked to reason
     def get_reason(log):
@@ -495,7 +500,7 @@ async def get_auth_logs(user_id: str, db: Session = Depends(get_db)):
             result=log.result,
             layer_blocked=log.layer_blocked,
             created_at=log.created_at,
-            reason=get_reason(log)
+            reason=get_reason(log),
         )
         for log in logs
     ]

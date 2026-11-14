@@ -90,7 +90,7 @@ def test_update_voiceprint_ema():
         assert abs(val - 1.2) < 1e-6, f"Expected 1.2, got {val}"
 
     # Test custom alpha (e.g. 0.5)
-    updated_half = update_voiceprint([0.0]*192, [10.0]*192, alpha=0.5)
+    updated_half = update_voiceprint([0.0] * 192, [10.0] * 192, alpha=0.5)
     for val in updated_half:
         assert abs(val - 5.0) < 1e-6, f"Expected 5.0, got {val}"
 

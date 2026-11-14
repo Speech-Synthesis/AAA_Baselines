@@ -23,7 +23,7 @@ class WhisperASRAdapter(ASRAdapter):
             name="Whisper ASR",
             version="1.0.0",
             model_id=f"openai/whisper-{self._model_name}",
-            is_loaded=self._loaded
+            is_loaded=self._loaded,
         )
 
     def is_ready(self) -> bool:
@@ -61,14 +61,10 @@ class WhisperASRAdapter(ASRAdapter):
         return ASRResult(
             transcript=transcript or "",
             confidence=1.0,  # Whisper doesn't provide per-result confidence
-            similarity=None
+            similarity=None,
         )
 
-    def compare_phrases(
-        self,
-        transcript: str,
-        expected: str
-    ) -> float:
+    def compare_phrases(self, transcript: str, expected: str) -> float:
         """
         Compare transcript to expected phrase using sequence matching.
 
@@ -92,10 +88,7 @@ class WhisperASRAdapter(ASRAdapter):
         return SequenceMatcher(None, t1, t2).ratio()
 
     def verify_phrase(
-        self,
-        audio_bytes: bytes,
-        expected_phrase: str,
-        threshold: float = 0.6
+        self, audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
     ) -> ASRResult:
         """
         Verify if audio contains expected phrase.
@@ -112,13 +105,7 @@ class WhisperASRAdapter(ASRAdapter):
         """
         from ..layer3_asr import verify_phrase as l3_verify
 
-        is_match, similarity, transcript = l3_verify(
-            audio_bytes, expected_phrase, threshold
-        )
+        is_match, similarity, transcript = l3_verify(audio_bytes, expected_phrase, threshold)
         self._loaded = True
 
-        return ASRResult(
-            transcript=transcript or "",
-            confidence=1.0,
-            similarity=similarity
-        )
+        return ASRResult(transcript=transcript or "", confidence=1.0, similarity=similarity)

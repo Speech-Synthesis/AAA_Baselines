@@ -48,13 +48,13 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
             "retry_after": getattr(exc, "retry_after", 60),
             "details": {
                 "limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown",
-                "documentation": "See API documentation for rate limit details"
-            }
+                "documentation": "See API documentation for rate limit details",
+            },
         },
         headers={
             "Retry-After": str(getattr(exc, "retry_after", 60)),
-            "X-RateLimit-Limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown"
-        }
+            "X-RateLimit-Limit": str(exc.detail) if hasattr(exc, "detail") else "Unknown",
+        },
     )
 
 

@@ -69,10 +69,7 @@ def detect_spoof(audio_bytes: bytes) -> dict:
         waveform = _load_audio(audio_bytes)
 
         inputs = _FEATURE_EXTRACTOR(
-            waveform,
-            sampling_rate=16000,
-            return_tensors="pt",
-            padding=True
+            waveform, sampling_rate=16000, return_tensors="pt", padding=True
         )
 
         device = next(_MODEL.parameters()).device
@@ -94,10 +91,7 @@ def detect_spoof(audio_bytes: bytes) -> dict:
             label = "spoof"
             confidence = fake_prob
 
-        return {
-            "label": label,
-            "confidence": float(confidence)
-        }
+        return {"label": label, "confidence": float(confidence)}
 
     except Exception as e:
         print(f"Error in detect_spoof: {e}")

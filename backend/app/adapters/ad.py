@@ -23,7 +23,7 @@ class Wav2VecDeepfakeAdapter(DeepfakeDetectionAdapter):
             name="Wav2Vec2 Deepfake Detection",
             version="1.0.0",
             model_id="wav2vec2-antispoof",
-            is_loaded=self._loaded
+            is_loaded=self._loaded,
         )
 
     def is_ready(self) -> bool:
@@ -60,8 +60,4 @@ class Wav2VecDeepfakeAdapter(DeepfakeDetectionAdapter):
         label = result["label"]
         confidence = result["confidence"]
 
-        return DeepfakeResult(
-            label=label,
-            confidence=confidence,
-            is_spoof=(label == "spoof")
-        )
+        return DeepfakeResult(label=label, confidence=confidence, is_spoof=(label == "spoof"))

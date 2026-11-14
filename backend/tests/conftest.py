@@ -8,18 +8,20 @@ import sys
 import pytest
 
 # Add backend/app to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Set test environment BEFORE any imports
 os.environ["DEBUG"] = "true"
 os.environ["DATABASE_URL"] = "sqlite:///./test_aaa_engine.db"
 os.environ["L3_HMAC_SECRET"] = "test-hmac-secret-for-testing-only"
+os.environ["AAA_JWT_SECRET"] = "9f8e4d2a1b7c6e5f3a0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f"
 
 
 @pytest.fixture(scope="session")
 def app():
     """Create FastAPI application for testing."""
     from app.main import app
+
     return app
 
 
@@ -27,6 +29,7 @@ def app():
 def client(app):
     """Create test client."""
     from fastapi.testclient import TestClient
+
     return TestClient(app)
 
 
@@ -53,6 +56,7 @@ def db_session():
 def reset_token_store():
     """Reset in-memory token store between tests."""
     from app.layer3_adaptive import _token_store
+
     _token_store.clear()
     yield
     _token_store.clear()
@@ -62,6 +66,7 @@ def reset_token_store():
 def clear_settings_cache():
     """Clear settings cache to pick up test environment variables."""
     from app.core.config import get_settings
+
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

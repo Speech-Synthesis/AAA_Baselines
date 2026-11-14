@@ -3,6 +3,11 @@ AAA Engine Core Configuration
 Centralized configuration management with environment variable support.
 """
 
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseModel as BaseSettings
+
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings

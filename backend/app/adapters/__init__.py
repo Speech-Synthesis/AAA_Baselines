@@ -17,6 +17,7 @@ from .mock import (
     MockSpeakerAdapter,
 )
 from .sv import EcapaSpeakerAdapter
+from .vr import TranscriptRiskAdapter
 
 __all__ = [
     # Base classes
@@ -28,6 +29,7 @@ __all__ = [
     "EcapaSpeakerAdapter",
     "Wav2VecDeepfakeAdapter",
     "WhisperASRAdapter",
+    "TranscriptRiskAdapter",
     # Mock implementations
     "MockSpeakerAdapter",
     "MockDeepfakeAdapter",

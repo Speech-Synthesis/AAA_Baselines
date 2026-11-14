@@ -4,6 +4,16 @@ Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expecte
 Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase matcher.
 """
 
+import difflib
+import io
+import os
+import re
+import sys
+
+# Fix Windows console encoding issues
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from __future__ import annotations
 
 import difflib
@@ -52,6 +62,29 @@ def _normalize_text(text: str) -> str:
     """
     Normalize text for comparison using approved AAA-ASR normalizer.
     """
+    text = text.lower().strip()
+    # Remove punctuation
+    text = re.sub(r"[^\w\s]", "", text)
+    # Collapse whitespace
+    text = re.sub(r"\s+", " ", text)
+
+    # Normalize numbers: convert words to digits for consistent comparison
+    number_map = {
+        "zero": "0",
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
+    }
+    for word, digit in number_map.items():
+        text = re.sub(rf"\b{word}\b", digit, text)
+
+    return text
     return aaa_normalize_text(text)
 
 
@@ -101,15 +134,12 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     # Resample to 16kHz if needed (Whisper requires 16kHz)
     if sample_rate != 16000:
         from scipy import signal
+
         num_samples = int(len(audio_data) * 16000 / sample_rate)
         audio_data = signal.resample(audio_data, num_samples)
 
     # Whisper transcription
-    result = model.transcribe(
-        audio_data,
-        language="en",
-        fp16=torch.cuda.is_available()
-    )
+    result = model.transcribe(audio_data, language="en", fp16=torch.cuda.is_available())
 
     transcript = result.get("text", "").strip()
     # Safe print for Windows console
@@ -120,6 +150,9 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcript
 
 
+def verify_phrase(
+    audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
+) -> tuple[bool, float, str]:
 def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
