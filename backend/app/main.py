@@ -49,27 +49,52 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 # Include v1 API router
 app.include_router(v1_router)
 
-# CORS for frontend - using settings for origins
-# Note: Wildcard patterns preserved for backward compatibility
-# TODO: Restrict to specific origins in production
-cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else []
-cors_origins.extend(
-    [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "https://aaa-frontend.onrender.com",
-        "https://*.onrender.com",
-        "https://*.hf.space",
-    ]
-)
+# CORS for frontend - explicit allowed origins only
+# Wildcard patterns are NOT allowed for security
+def get_allowed_origins() -> list[str]:
+    """Get CORS allowed origins from settings, filtering out wildcards."""
+    import logging
+
+    logger = logging.getLogger("aaa_engine.cors")
+
+    # Start with configured origins
+    origins: list[str] = []
+    if settings.CORS_ORIGINS:
+        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
+    # Add explicit localhost origins for development
+    if settings.DEBUG:
+        dev_origins = [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:3000",
+        ]
+        for origin in dev_origins:
+            if origin not in origins:
+                origins.append(origin)
+
+    # Filter out any wildcard patterns and log warning
+    safe_origins = []
+    for origin in origins:
+        if "*" in origin:
+            logger.warning(
+                f"SECURITY: Wildcard CORS origin '{origin}' rejected. "
+                "Use explicit origins only."
+            )
+        else:
+            safe_origins.append(origin)
+
+    return safe_origins
+
+
+cors_origins = get_allowed_origins()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
 )
 
 # Serve static frontend files (for production deployment)
