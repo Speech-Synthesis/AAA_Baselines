@@ -63,7 +63,7 @@ export const demoCalls = [
     demo: true,
     riskLevel: "LOW",
     reasonPublic: "ROUTINE_TRANSACTION",
-    recommendedAction: "VERIFY_VOICE",
+    recommendedAction: "APPROVE",
     verificationStatus: "PENDING_CHALLENGE",
     transcript: [
       { id: "seg_1", speaker: "agent", text: "Thank you for calling Secure Trust. My name is Sarah. How can I help you today?", timestamp: "00:05" },
@@ -81,9 +81,9 @@ export const demoCalls = [
     scenarioName: "Scenario 2: Suspected Urgent Credential Solicit (Vishing)",
     scenarioDescription: "Caller claims urgent IT security lock, pressures agent, solicit password/OTP.",
     demo: true,
-    riskLevel: "HIGH",
+    riskLevel: "CRITICAL",
     reasonPublic: "URGENT_CREDENTIAL_SOLICITATION",
-    recommendedAction: "ESCALATE_HUMAN_REVIEW",
+    recommendedAction: "DENY",
     verificationStatus: "FAILED_CHALLENGE",
     transcript: [
       { id: "seg_10", speaker: "caller", text: "Listen to me, I am the director of corporate finance and my executive portal is locked right now!", timestamp: "00:04" },
@@ -103,7 +103,7 @@ export const demoCalls = [
     demo: true,
     riskLevel: "LOW",
     reasonPublic: "SECURITY_AWARENESS_WARNING",
-    recommendedAction: "NONE",
+    recommendedAction: "APPROVE",
     verificationStatus: "NOT_INITIATED",
     transcript: [
       { id: "seg_20", speaker: "agent", text: "As a security precaution from our Fraud Prevention Unit, remember we will never ask you to share your OTP or password.", timestamp: "00:08" },

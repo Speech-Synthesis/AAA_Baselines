@@ -105,8 +105,9 @@ export async function getVerificationResult(requestId) {
  * 
  * @param {Array<{speaker: string, text: string, timestamp: string}> | string} segments
  * @param {string} [sessionId]
+ * @param {string} [authToken]
  */
-export async function analyzeTranscriptRisk(segments, sessionId = "call-session-demo") {
+export async function analyzeTranscriptRisk(segments, sessionId = "call-session-demo", authToken = null) {
   if (USE_MOCK) {
     let textToAnalyze = "";
     if (Array.isArray(segments)) {
@@ -253,12 +254,38 @@ export async function analyzeTranscriptRisk(segments, sessionId = "call-session-
     };
   }
 
+  // Live backend proxy call (Aligned with TranscriptRiskRequest schema in backend/app/schemas/risk.py)
+  let transcriptText = "";
+  if (Array.isArray(segments)) {
+    transcriptText = segments
+      .map(s => (s && s.text ? s.text : ""))
+      .filter(Boolean)
+      .join(" ");
+  } else if (typeof segments === "string") {
+    transcriptText = segments;
+  }
+  if (!transcriptText.trim()) {
+    transcriptText = "No speech transcript available";
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Request-ID": `cg-${Date.now()}`
+  };
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
   const res = await fetch(`${API_BASE}/v1/risk/transcript`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
-      tenant_id: DEMO_TENANT,
-      segments
+      session_id: sessionId || "call-session-demo",
+      transcript: transcriptText,
+      context: {
+        client: "callguard-console",
+        version: "0.1.0"
+      }
     })
   });
   if (!res.ok) throw new Error(`Vishing risk analysis failed: ${res.statusText}`);
