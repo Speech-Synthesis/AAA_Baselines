@@ -43,8 +43,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_VERIFY: str = "5/minute"
     RATE_LIMIT_ENROLL: str = "3/5minutes"
 
-    # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    # CORS - explicit origins only, no wildcards allowed
+    # In production, set this to the actual frontend URLs
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://aaa-frontend.onrender.com"
 
     class Config:
         env_file = ".env"
