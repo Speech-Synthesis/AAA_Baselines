@@ -110,6 +110,26 @@ export const demoCalls = [
       { id: "seg_21", speaker: "caller", text: "Thank you for the reminder. I received an odd text earlier asking for my code, which made me call you.", timestamp: "00:18" },
       { id: "seg_22", speaker: "agent", text: "You did the right thing. Let us verify your account safely.", timestamp: "00:27" }
     ]
+  },
+  {
+    id: "CALL-2026-1004",
+    customerRef: "customer_002",
+    channel: "Inbound Customer Support",
+    status: "IN_PROGRESS",
+    duration: 65,
+    scenarioName: "Scenario 4: Address Change Request",
+    scenarioDescription: "Customer requests update to registered address and unverified beneficiary details.",
+    demo: true,
+    riskLevel: "MEDIUM",
+    reasonPublic: "UNVERIFIED_BENEFICIARY",
+    recommendedAction: "REVIEW",
+    verificationStatus: "NOT_INITIATED",
+    transcript: [
+      { id: "seg_30", speaker: "agent", text: "Thank you for calling Secure Trust. My name is Sarah. How may I assist you today?", timestamp: "00:05" },
+      { id: "seg_31", speaker: "caller", text: "Hello, I recently moved to a new address. I would like to update my registered address and change the beneficiary details on my account. Can you help me verify the changes?", timestamp: "00:15" },
+      { id: "seg_32", speaker: "agent", text: "I can assist with that. Updating registered addresses and adding an unverified beneficiary requires standard security review.", timestamp: "00:26" },
+      { id: "seg_33", speaker: "caller", text: "Understood, I have the required documents ready for review whenever needed.", timestamp: "00:34" }
+    ]
   }
 ];
 
