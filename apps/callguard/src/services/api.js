@@ -11,8 +11,8 @@
  * 4. Mode: Configurable Mock Adapter (Day 1 Integration Preparation).
  */
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_API !== "false"; // Defaults to true for Day 1
-const API_BASE = import.meta.env.VITE_AAA_API_BASE_URL || "http://localhost:8000";
+const USE_MOCK = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_USE_MOCK_API === "false" ? false : true; // Defaults to true
+const API_BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_AAA_API_BASE_URL) || "http://localhost:8000";
 const DEMO_TENANT = "callcentre_demo";
 
 /**
@@ -95,43 +95,160 @@ export async function getVerificationResult(requestId) {
  * Submit transcript segments to AAA-VR for vishing and social engineering risk analysis.
  * Calls POST /v1/risk/transcript
  * 
- * @param {Array<{speaker: string, text: string, timestamp: string}>} segments
+ * Complies with frozen AAA-VR contract (CALLGUARD_RISK_INTEGRATION_REPORT.md):
+ * - request_id, session_id, risk_level (LOW, MEDIUM, HIGH, CRITICAL)
+ * - risk_indicators (array of public reason codes)
+ * - recommended_action (APPROVE, REVIEW, STEP_UP, DENY)
+ * - confidence (float between 0.0 and 1.0)
+ * - model_version ("aaa-vr-transcript-risk-v1")
+ * - analyzed_at (ISO 8601 string)
+ * 
+ * @param {Array<{speaker: string, text: string, timestamp: string}> | string} segments
+ * @param {string} [sessionId]
  */
-export async function analyzeTranscriptRisk(segments) {
+export async function analyzeTranscriptRisk(segments, sessionId = "call-session-demo") {
   if (USE_MOCK) {
-    const combinedText = segments.map(s => s.text.toLowerCase()).join(" ");
+    let textToAnalyze = "";
+    if (Array.isArray(segments)) {
+      textToAnalyze = segments.map(s => (s && s.text ? s.text : "")).join(" ").toLowerCase();
+    } else if (typeof segments === "string") {
+      textToAnalyze = segments.toLowerCase();
+    }
     
+    const nowIso = new Date().toISOString();
+    const requestId = "req_" + Math.random().toString(36).substring(2, 10) + "-" + Math.random().toString(36).substring(2, 6);
+    const resolvedSessionId = sessionId || "call-session-demo";
+
     // Hard negative check: Genuine security advisory from bank agent
-    if (combinedText.includes("never share your otp") || combinedText.includes("fraud prevention unit")) {
+    const isSecurityAdvisory = textToAnalyze.includes("never share your otp") || 
+      textToAnalyze.includes("never ask you to share") ||
+      textToAnalyze.includes("fraud prevention unit");
+
+    if (isSecurityAdvisory) {
       return {
+        request_id: requestId,
+        session_id: resolvedSessionId,
         risk_level: "LOW",
-        reason_public: "SECURITY_AWARENESS_WARNING",
-        recommended_action: "NONE",
+        risk_indicators: [],
+        recommended_action: "APPROVE",
+        confidence: 0.98,
+        model_version: "aaa-vr-transcript-risk-v1",
+        analyzed_at: nowIso,
+        // Backward-compatibility aliases
+        reason_public: "ROUTINE_INQUIRY",
         detected_triggers: [],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso,
         _mock: true
       };
     }
 
-    // High risk triggers (urgency + credential solicitation)
-    if (combinedText.includes("bypass") || combinedText.includes("terminate") || (combinedText.includes("otp") && combinedText.includes("immediately"))) {
+    // 1. Critical threat: Credential harvesting, extortion, termination threats, OTP bypass
+    const hasCredentialHarvesting = textToAnalyze.includes("bypass") || 
+      (textToAnalyze.includes("otp") && (textToAnalyze.includes("read back") || textToAnalyze.includes("immediately") || textToAnalyze.includes("share"))) ||
+      (textToAnalyze.includes("password") && textToAnalyze.includes("give")) ||
+      (textToAnalyze.includes("pin") && textToAnalyze.includes("tell"));
+    const hasPressureTactics = textToAnalyze.includes("terminate") || 
+      (textToAnalyze.includes("supervisor") && textToAnalyze.includes("fire")) ||
+      textToAnalyze.includes("arrest") || textToAnalyze.includes("legal action") ||
+      textToAnalyze.includes("no time for procedures");
+    const hasImpersonation = textToAnalyze.includes("director of") || 
+      textToAnalyze.includes("federal agent") || 
+      (textToAnalyze.includes("fraud desk") && textToAnalyze.includes("calling from"));
+
+    if (hasCredentialHarvesting || (hasPressureTactics && hasImpersonation)) {
+      const indicators = [];
+      if (hasCredentialHarvesting) indicators.push("CREDENTIAL_HARVESTING_ATTEMPT");
+      if (hasPressureTactics) indicators.push("PRESSURE_TACTICS_DETECTED");
+      if (hasImpersonation) indicators.push("IMPERSONATION_ATTEMPT");
+      if (indicators.length === 0) indicators.push("CREDENTIAL_HARVESTING_ATTEMPT");
+
       return {
-        risk_level: "HIGH",
-        reason_public: "URGENT_CREDENTIAL_SOLICITATION",
-        recommended_action: "ESCALATE_HUMAN_REVIEW",
-        detected_triggers: ["URGENCY_PRESSURE", "CREDENTIAL_COERCION"],
-        timestamp: new Date().toISOString(),
+        request_id: requestId,
+        session_id: resolvedSessionId,
+        risk_level: "CRITICAL",
+        risk_indicators: indicators,
+        recommended_action: "DENY",
+        confidence: 0.96,
+        model_version: "aaa-vr-transcript-risk-v1",
+        analyzed_at: nowIso,
+        // Backward-compatibility aliases
+        reason_public: indicators[0],
+        detected_triggers: indicators,
+        timestamp: nowIso,
         _mock: true
       };
     }
 
-    // Standard low risk default
+    // 2. High risk: Urgent wire / funds transfer demands with pressure or unverified destination
+    const hasUrgentTransfer = (textToAnalyze.includes("urgent") || textToAnalyze.includes("immediately")) && 
+      (textToAnalyze.includes("wire") || textToAnalyze.includes("transfer") || textToAnalyze.includes("funds"));
+    
+    if (hasUrgentTransfer || hasPressureTactics) {
+      const indicators = [];
+      if (hasUrgentTransfer) indicators.push("URGENT_TRANSFER_REQUEST");
+      if (hasPressureTactics) indicators.push("PRESSURE_TACTICS_DETECTED");
+      if (textToAnalyze.includes("account ending") || textToAnalyze.includes("account number") || textToAnalyze.includes("routing number")) {
+        indicators.push("ACCOUNT_NUMBER_MENTIONED");
+      }
+      if (indicators.length === 0) indicators.push("URGENT_TRANSFER_REQUEST");
+
+      return {
+        request_id: requestId,
+        session_id: resolvedSessionId,
+        risk_level: "HIGH",
+        risk_indicators: indicators,
+        recommended_action: "STEP_UP",
+        confidence: 0.89,
+        model_version: "aaa-vr-transcript-risk-v1",
+        analyzed_at: nowIso,
+        // Backward-compatibility aliases
+        reason_public: indicators[0],
+        detected_triggers: indicators,
+        timestamp: nowIso,
+        _mock: true
+      };
+    }
+
+    // 3. Medium risk: Address change request, unverified beneficiary, sensitive account disclosure
+    const hasAddressChange = textToAnalyze.includes("address") || textToAnalyze.includes("unverified beneficiary") || textToAnalyze.includes("new beneficiary");
+    const hasAccountMention = textToAnalyze.includes("account number") || textToAnalyze.includes("routing") || textToAnalyze.includes("iban");
+
+    if (hasAddressChange || hasAccountMention) {
+      const indicators = [];
+      if (hasAddressChange) indicators.push("UNVERIFIED_BENEFICIARY");
+      if (hasAccountMention) indicators.push("ACCOUNT_NUMBER_MENTIONED");
+
+      return {
+        request_id: requestId,
+        session_id: resolvedSessionId,
+        risk_level: "MEDIUM",
+        risk_indicators: indicators,
+        recommended_action: "REVIEW",
+        confidence: 0.74,
+        model_version: "aaa-vr-transcript-risk-v1",
+        analyzed_at: nowIso,
+        // Backward-compatibility aliases
+        reason_public: indicators[0],
+        detected_triggers: indicators,
+        timestamp: nowIso,
+        _mock: true
+      };
+    }
+
+    // 4. Low risk default: Routine balance inquiry, standard transaction checks
     return {
+      request_id: requestId,
+      session_id: resolvedSessionId,
       risk_level: "LOW",
+      risk_indicators: [],
+      recommended_action: "APPROVE",
+      confidence: 0.95,
+      model_version: "aaa-vr-transcript-risk-v1",
+      analyzed_at: nowIso,
+      // Backward-compatibility aliases
       reason_public: "ROUTINE_INQUIRY",
-      recommended_action: "NONE",
       detected_triggers: [],
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso,
       _mock: true
     };
   }
