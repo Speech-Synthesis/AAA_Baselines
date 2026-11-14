@@ -216,7 +216,7 @@ class TestSecretConfiguration:
             from app.core.exceptions import MissingSecretError
 
             with pytest.raises(MissingSecretError):
-                pass
+                import app.layer3_adaptive  # noqa: F401
         finally:
             # Restore original values
             if orig_debug is not None:
@@ -248,24 +248,4 @@ class TestDefaultDenyBehavior:
         pass
 
 
-# Pytest fixtures
-@pytest.fixture
-def client():
-    """Create test client."""
-    from fastapi.testclient import TestClient
 
-    from app.main import app
-
-    return TestClient(app)
-
-
-@pytest.fixture
-def db_session():
-    """Create test database session."""
-    from app.db import SessionLocal
-
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
