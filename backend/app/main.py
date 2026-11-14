@@ -30,6 +30,7 @@ from .layer2_deepfake import detect_spoof
 from .layer3_adaptive import generate_challenge, get_token_phrase, update_voiceprint, verify_token
 from .layer3_asr import verify_phrase
 from .models import AuthLog, Challenge, User, Voiceprint
+from .security.jwt_auth import router as auth_router
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -48,6 +49,9 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Include v1 API router
 app.include_router(v1_router)
+
+# Include JWT authentication router
+app.include_router(auth_router)
 
 # CORS for frontend - explicit allowed origins only
 # Wildcard patterns are NOT allowed for security

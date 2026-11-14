@@ -26,10 +26,33 @@ from ...db import get_db
 from ...layer1_speaker import enroll_speaker
 from ...layer3_adaptive import update_voiceprint
 from ...models import User, Voiceprint
+from ...security.jwt_auth import oauth2_scheme
+from ...services.voiceprint_service import decrypt_embedding, encrypt_embedding
 
 router = APIRouter(prefix="/enroll", tags=["enrollment"])
 
 settings = get_settings()
+
+
+def get_optional_tenant(token: str | None = Depends(oauth2_scheme)) -> str | None:
+    """Optional JWT authentication - returns tenant_id if token provided, None otherwise."""
+    if not token:
+        return None
+    try:
+        from jose import jwt
+
+        from ...security.jwt_auth import JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET
+
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+        return payload.get("tenant_id") or payload.get("sub")
+    except Exception:
+        return None
 
 
 class EnrollmentResponse(BaseModel):
@@ -55,6 +78,7 @@ async def enroll_voice(
     audio: UploadFile = File(..., description="Audio file (WAV format preferred)"),
     x_request_id: str | None = Header(None, alias="X-Request-ID"),
     db: Session = Depends(get_db),
+    tenant_id: str | None = Depends(get_optional_tenant),
 ) -> EnrollmentResponse:
     """
     Enroll a voice sample for a user.
@@ -98,16 +122,27 @@ async def enroll_voice(
     is_new = voiceprint is None
 
     if voiceprint:
+        # Decrypt existing embedding for EMA update
+        existing_embedding = decrypt_embedding(
+            voiceprint.embedding, tenant_id=tenant_id, user_id=user_id
+        )
         # Update existing voiceprint with EMA
-        updated_embedding = update_voiceprint(voiceprint.embedding, embedding)
-        voiceprint.embedding = updated_embedding
+        updated_embedding = update_voiceprint(existing_embedding, embedding)
+        # Encrypt updated embedding before storage
+        voiceprint.embedding = encrypt_embedding(
+            updated_embedding, tenant_id=tenant_id, user_id=user_id
+        )
         voiceprint.sample_count += 1
         voiceprint.updated_at = datetime.utcnow()
     else:
+        # Encrypt embedding before storage
+        encrypted_embedding = encrypt_embedding(
+            embedding, tenant_id=tenant_id, user_id=user_id
+        )
         # Create new voiceprint
         voiceprint = Voiceprint(
             user_id=uuid.UUID(user_id),
-            embedding=embedding,
+            embedding=encrypted_embedding,
             sample_count=1,
         )
         db.add(voiceprint)

@@ -33,10 +33,33 @@ from ...layer3_adaptive import (
 from ...layer3_asr import verify_phrase
 from ...models import AuthLog, User, Voiceprint
 from ...schemas.common import Decision
+from ...security.jwt_auth import oauth2_scheme
+from ...services.voiceprint_service import decrypt_embedding, encrypt_embedding
 
 router = APIRouter(prefix="/verify", tags=["authentication"])
 
 settings = get_settings()
+
+
+def get_optional_tenant(token: str | None = Depends(oauth2_scheme)) -> str | None:
+    """Optional JWT authentication - returns tenant_id if token provided, None otherwise."""
+    if not token:
+        return None
+    try:
+        from jose import jwt
+
+        from ...security.jwt_auth import JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET
+
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+        return payload.get("tenant_id") or payload.get("sub")
+    except Exception:
+        return None
 
 
 class VerificationResult(BaseModel):
@@ -79,6 +102,7 @@ async def verify_authentication(
     audio: UploadFile = File(..., description="Audio file (WAV format preferred)"),
     x_request_id: str | None = Header(None, alias="X-Request-ID"),
     db: Session = Depends(get_db),
+    tenant_id: str | None = Depends(get_optional_tenant),
 ) -> VerificationResult:
     """
     Verify user's voice authentication.
@@ -86,6 +110,7 @@ async def verify_authentication(
     Pipeline: L2 (deepfake) → L3A (ASR phrase) → L1 (speaker) → L3B (token)
 
     Returns only safe decision information - no raw scores or embeddings.
+    Optionally authenticated via Bearer JWT token.
     """
     req_id = x_request_id or str(uuid.uuid4())
     session_id = str(uuid.uuid4())
@@ -186,7 +211,11 @@ async def verify_authentication(
         )
 
     # === LAYER 1: Speaker Verification ===
-    l1_result = verify_speaker(audio_bytes, voiceprint.embedding)
+    # Decrypt stored embedding for comparison
+    stored_embedding = decrypt_embedding(
+        voiceprint.embedding, tenant_id=tenant_id, user_id=user_id
+    )
+    l1_result = verify_speaker(audio_bytes, stored_embedding)
     l1_score = l1_result["score"]
     new_embedding = l1_result["embedding"]
 
@@ -227,8 +256,12 @@ async def verify_authentication(
         )
 
     # === SUCCESS: Update voiceprint with EMA ===
-    updated_embedding = update_voiceprint(voiceprint.embedding, new_embedding)
-    voiceprint.embedding = updated_embedding
+    # stored_embedding was already decrypted for L1 verification above
+    updated_embedding = update_voiceprint(stored_embedding, new_embedding)
+    # Encrypt updated embedding before storage
+    voiceprint.embedding = encrypt_embedding(
+        updated_embedding, tenant_id=tenant_id, user_id=user_id
+    )
     voiceprint.sample_count += 1
     voiceprint.updated_at = datetime.utcnow()
 

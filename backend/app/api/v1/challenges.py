@@ -6,7 +6,7 @@ Endpoint for generating authentication challenge phrases and tokens.
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,10 +15,33 @@ from ...core.ratelimit import limiter
 from ...db import get_db
 from ...layer3_adaptive import generate_challenge
 from ...models import User, Voiceprint
+from ...security.jwt_auth import oauth2_scheme
 
 router = APIRouter(prefix="/challenges", tags=["authentication"])
 
 settings = get_settings()
+
+
+def get_optional_tenant(token: str | None = Depends(oauth2_scheme)) -> str | None:
+    """Optional JWT authentication - returns tenant_id if token provided, None otherwise."""
+    if not token:
+        return None
+    try:
+        # Reuse the existing get_current_tenant logic but catch exceptions
+        from jose import jwt
+
+        from ...security.jwt_auth import JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET
+
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+        return payload.get("tenant_id") or payload.get("sub")
+    except Exception:
+        return None
 
 
 class ChallengeRequest(BaseModel):
@@ -46,20 +69,23 @@ class ChallengeResponse(BaseModel):
 )
 @limiter.limit(settings.RATE_LIMIT_CHALLENGES)
 def create_challenge(
-    request: ChallengeRequest,
+    request: Request,
+    body: ChallengeRequest,
     x_request_id: str | None = Header(None, alias="X-Request-ID"),
     db: Session = Depends(get_db),
+    tenant_id: str | None = Depends(get_optional_tenant),
 ) -> ChallengeResponse:
     """
     Generate a new authentication challenge for a user.
 
     The user must exist and have an enrolled voiceprint.
     Returns a phrase to speak and a token for verification.
+    Optionally authenticated via Bearer JWT token.
     """
     req_id = x_request_id or str(uuid.uuid4())
 
     # Validate user exists
-    user = db.query(User).filter(User.id == request.user_id).first()
+    user = db.query(User).filter(User.id == body.user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -67,7 +93,7 @@ def create_challenge(
         )
 
     # Validate user has voiceprint
-    voiceprint = db.query(Voiceprint).filter(Voiceprint.user_id == request.user_id).first()
+    voiceprint = db.query(Voiceprint).filter(Voiceprint.user_id == body.user_id).first()
     if not voiceprint:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -78,7 +104,7 @@ def create_challenge(
         )
 
     # Generate challenge and persist to database
-    challenge_data = generate_challenge(request.user_id, db=db)
+    challenge_data = generate_challenge(body.user_id, db=db)
 
     return ChallengeResponse(
         request_id=req_id,
