@@ -135,7 +135,12 @@ class TestSecurityJWTAuth(unittest.TestCase):
             from fastapi.middleware.cors import CORSMiddleware
 
             cors_mw = next(m for m in test_app.user_middleware if m.cls == CORSMiddleware)
-            self.assertEqual(cors_mw.options["allow_origins"], [])
+            origins = (
+                cors_mw.kwargs.get("allow_origins")
+                if hasattr(cors_mw, "kwargs")
+                else cors_mw.options.get("allow_origins")
+            )
+            self.assertEqual(origins, [])
         finally:
             if orig_env is not None:
                 os.environ["ALLOWED_ORIGINS"] = orig_env
@@ -149,9 +154,12 @@ class TestSecurityJWTAuth(unittest.TestCase):
             from fastapi.middleware.cors import CORSMiddleware
 
             cors_mw = next(m for m in test_app.user_middleware if m.cls == CORSMiddleware)
-            self.assertEqual(
-                cors_mw.options["allow_origins"], ["https://bank.com", "https://app.io"]
+            origins = (
+                cors_mw.kwargs.get("allow_origins")
+                if hasattr(cors_mw, "kwargs")
+                else cors_mw.options.get("allow_origins")
             )
+            self.assertEqual(origins, ["https://bank.com", "https://app.io"])
         finally:
             if orig_env is not None:
                 os.environ["ALLOWED_ORIGINS"] = orig_env
