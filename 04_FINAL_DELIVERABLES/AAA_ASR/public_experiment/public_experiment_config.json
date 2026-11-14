@@ -1,0 +1,107 @@
+{
+  "experiment_name": "AAA_ASR_Whisper_Base_Public_Experiment_2",
+  "version": "v1.2-public-multilingual-frozen-encoder",
+  "track": "PUBLIC_DATASET_BENCHMARK",
+  "created_at": "2026-11-14T11:00:00+05:30",
+  "author": "Nandan (Member 5 — AAA-ASR)",
+  "governance": {
+    "public_data_only": true,
+    "in_house_audio_included": false,
+    "licence_documented": true,
+    "licence": "CC BY 4.0",
+    "strict_e_drive": true,
+    "held_out_test_set_preserved": true,
+    "split_notes": "public_test.jsonl is an internal speaker-disjoint partition of dev-clean. Experiment 1 conducted baseline zero-shot evaluation; Experiment 2 evaluates fine-tuned checkpoint as subsequent evaluation.",
+    "experiment_history": {
+      "experiment_1_test_evaluation": "zero_shot_baseline_only",
+      "experiment_2_test_evaluation": "subsequent_fine_tuned_evaluation"
+    }
+  },
+  "model_specification": {
+    "architecture": "openai-whisper",
+    "base_checkpoint": "base",
+    "multilingual": true,
+    "language": "en",
+    "task": "transcribe",
+    "num_parameters": 71825920,
+    "trainable_parameters": 52003328,
+    "frozen_parameters": 19822592,
+    "training_strategy": "frozen_encoder_decoder_only",
+    "freeze_encoder": true,
+    "encoder_layers": 6,
+    "decoder_layers": 6,
+    "hidden_size": 512,
+    "attention_heads": 8,
+    "vocab_size": 51865,
+    "mel_bins": 80,
+    "sample_rate_hz": 16000,
+    "window_size_seconds": 30.0,
+    "token_formatting": "leading_space_lowercase",
+    "native_export_contract": {
+      "required_keys": ["dims", "model_state_dict"],
+      "dims_format": "dictionary (model.dims.__dict__)",
+      "format": "torch_pt",
+      "compatible_loader": "whisper.load_model",
+      "checkpoints": {
+        "zero_shot_baseline": "whisper_base_zero_shot_baseline.pt",
+        "best_fine_tuned": "whisper_base_public_best.pt",
+        "final_checkpoint": "whisper_base_public_final.pt"
+      }
+    }
+  },
+  "dataset_configuration": {
+    "dataset_name": "LibriSpeech",
+    "subset": "dev-clean (OpenSLR SLR12)",
+    "manifest_directory": "04_FINAL_DELIVERABLES/AAA_ASR/public_experiment",
+    "manifests": {
+      "train": "public_train.jsonl",
+      "val": "public_val.jsonl",
+      "cal": "public_cal.jsonl",
+      "test": "public_test.jsonl"
+    },
+    "speaker_disjoint": true,
+    "checksums_file": "public_manifest_checksums.sha256"
+  },
+  "training_hyperparameters": {
+    "batch_size_per_device": 8,
+    "gradient_accumulation_steps": 2,
+    "effective_batch_size": 16,
+    "learning_rate": 5e-06,
+    "min_learning_rate": 5e-08,
+    "max_epochs": 3,
+    "total_batches_per_epoch": 193,
+    "optimizer_updates_per_epoch": 97,
+    "total_optimizer_steps": 291,
+    "warmup_steps": 35,
+    "lr_scheduler": "cosine_with_warmup",
+    "optimizer": "AdamW",
+    "weight_decay": 0.01,
+    "betas": [0.9, 0.98],
+    "eps": 1e-08,
+    "gradient_clipping": 1.0,
+    "mixed_precision": "fp16",
+    "label_smoothing": 0.0,
+    "seed": 42
+  },
+  "validation_and_early_stopping": {
+    "eval_interval_steps": 50,
+    "early_stopping_patience": 3,
+    "metric_for_best_model": "val_wer",
+    "greater_is_better": false
+  },
+  "evaluation_metrics": {
+    "word_error_rate_wer": true,
+    "character_error_rate_cer": true,
+    "exact_phrase_accuracy_epa": true,
+    "calibration_confidence_metrics": true,
+    "normalization": "app.aaa_asr.phrase_matcher.normalize_text"
+  },
+  "pre_flight_gates": [
+    "GATE_1_GPU_AVAILABLE",
+    "GATE_2_VRAM_GE_8GB",
+    "GATE_3_MANIFESTS_EXIST",
+    "GATE_4_CHECKSUMS_VERIFIED",
+    "GATE_5_NO_SPEAKER_LEAKAGE",
+    "GATE_6_HELD_OUT_TEST_UNTOUCHED"
+  ]
+}
