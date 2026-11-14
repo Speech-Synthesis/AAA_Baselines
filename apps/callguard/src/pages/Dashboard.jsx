@@ -2,8 +2,41 @@ import React from 'react';
 import AuditHistory from '../components/AuditHistory';
 
 /**
+ * Helper to render consistently styled risk badges in the queue table.
+ * Supports LOW, MEDIUM, HIGH, and CRITICAL risk levels.
+ */
+function getQueueRiskBadge(level) {
+  const normLevel = typeof level === 'string' ? level.toUpperCase() : 'UNKNOWN';
+  switch (normLevel) {
+    case 'CRITICAL':
+      return (
+        <span
+          className="badge"
+          style={{
+            background: 'rgba(239, 68, 68, 0.35)',
+            color: '#ff4d4f',
+            border: '2px solid #ef4444',
+            boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)',
+            fontWeight: '700'
+          }}
+        >
+          CRITICAL RISK
+        </span>
+      );
+    case 'HIGH':
+      return <span className="badge badge-high">HIGH RISK</span>;
+    case 'MEDIUM':
+      return <span className="badge badge-medium">MEDIUM RISK</span>;
+    case 'LOW':
+      return <span className="badge badge-low">LOW RISK</span>;
+    default:
+      return <span className="badge badge-low">{normLevel} RISK</span>;
+  }
+}
+
+/**
  * Dashboard Page
- * 
+ *
  * Simulated Agent Call Queue and Overview.
  */
 export default function Dashboard({ agent, calls, onOpenCall, auditLogs }) {
@@ -53,7 +86,6 @@ export default function Dashboard({ agent, calls, onOpenCall, auditLogs }) {
             </thead>
             <tbody>
               {calls.map((call) => {
-                const isHighRisk = call.riskLevel === 'HIGH';
                 return (
                   <tr key={call.id}>
                     <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>{call.id}</td>
@@ -71,12 +103,10 @@ export default function Dashboard({ agent, calls, onOpenCall, auditLogs }) {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge ${isHighRisk ? 'badge-high' : 'badge-low'}`}>
-                        {call.riskLevel} RISK
-                      </span>
+                      {getQueueRiskBadge(call.riskLevel)}
                     </td>
                     <td>
-                      <button 
+                      <button
                         className="btn btn-primary btn-sm"
                         onClick={() => onOpenCall(call)}
                       >
