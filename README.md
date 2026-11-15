@@ -4,11 +4,12 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org)
-[![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://docker.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://postgresql.org)
+[![Tests](https://img.shields.io/badge/Tests-437%20passing-brightgreen.svg)](#testing)
 
 **Adaptive Audio Authentication with Deepfake Detection**
 
-A production-ready voice authentication system that combines four security layers: deepfake detection, phrase verification, speaker recognition, and adaptive voiceprint evolution.
+A production-ready voice authentication system combining multiple security layers: deepfake detection (AD), phrase verification (ASR), speaker recognition (SV), vishing risk analysis (VR), and a centralized five-outcome PolicyEngine.
 
 ---
 
@@ -17,220 +18,181 @@ A production-ready voice authentication system that combines four security layer
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
+- [Five-Outcome Policy](#five-outcome-policy)
 - [Security Layers](#security-layers)
-- [Performance Metrics](#performance-metrics)
 - [Quick Start](#quick-start)
 - [Project Structure](#project-structure)
 - [API Reference](#api-reference)
+- [Host Applications](#host-applications)
 - [Configuration](#configuration)
+- [Testing](#testing)
 - [Deployment](#deployment)
 - [Documentation](#documentation)
-- [Contributing](#contributing)
 - [License](#license)
 
 ---
 
 ## Overview
 
-AAA Engine implements a multi-layered voice authentication pipeline designed to protect against modern attack vectors including AI-generated deepfakes, voice cloning, and replay attacks. The system processes audio through four sequential security checks before granting access.
+AAA Engine implements a multi-layered voice authentication pipeline designed to protect against modern attack vectors including AI-generated deepfakes, voice cloning, replay attacks, and social engineering (vishing).
+
+### Key Differentiators
+
+- **Parallel Execution:** AD||ASR run concurrently for ~30% faster authentication
+- **SV Gating:** Speaker verification only runs after AD+ASR pass (security + cost)
+- **Five-Outcome Policy:** Not just accept/reject - includes STEP_UP, REVIEW, UNAVAILABLE
+- **Vishing Detection:** 10 risk indicators with hard-negative support
+- **Adaptive Voiceprints:** EMA-based evolution (0.8 old + 0.2 new)
+- **Tenant Isolation:** Row-Level Security for multi-tenant deployments
+- **AES-256-GCM:** Voiceprint encryption at rest
 
 ### Authentication Pipeline
 
 ```
-Audio Input
-    |
-    v
-+-------------------+     +-------------------+     +-------------------+
-|   Layer 2         |     |   ASR Layer       |     |   Layer 1         |
-|   Deepfake        | --> |   Phrase          | --> |   Speaker         |
-|   Detection       |     |   Verification    |     |   Verification    |
-|   (Wav2Vec2)      |     |   (Whisper)       |     |   (ECAPA-TDNN)    |
-+-------------------+     +-------------------+     +-------------------+
-    |                         |                         |
-    | Reject if               | Reject if               | Reject if
-    | spoof > 0.5             | similarity < 0.6        | score < 0.5
-    v                         v                         v
-+-------------------------------------------------------------------+
-|                        Layer 3                                     |
-|            Challenge-Response Token Validation                     |
-|                    + EMA Voiceprint Update                         |
-+-------------------------------------------------------------------+
-                              |
-                              v
-                      Authentication Result
+                           Audio Input
+                               |
+               +---------------+---------------+
+               |                               |
+               v                               v
+    +-------------------+           +-------------------+
+    |   AAA-AD (L2)     |           |   AAA-ASR         |
+    |   Deepfake        |  PARALLEL |   Phrase          |
+    |   Detection       |           |   Verification    |
+    |   (Wav2Vec2)      |           |   (Whisper)       |
+    +-------------------+           +-------------------+
+               |                               |
+               +---------------+---------------+
+                               |
+                         Both Pass?
+                               |
+                               v
+                    +-------------------+
+                    |   AAA-SV (L1)     |
+                    |   Speaker         |
+                    |   Verification    |
+                    |   (ECAPA-TDNN)    |
+                    +-------------------+
+                               |
+                               v
+                    +-------------------+
+                    |   POLICY ENGINE   |
+                    |                   |
+                    |   APPROVE         |
+                    |   DENY            |
+                    |   STEP_UP         |
+                    |   REVIEW          |
+                    |   UNAVAILABLE     |
+                    +-------------------+
 ```
 
 ### Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Backend | FastAPI 0.104+ | REST API framework |
+| Backend | FastAPI 0.104+ | Async REST API |
 | Frontend | React 18 + Vite 5 | User interface |
-| Database | PostgreSQL 15 / SQLite | Data persistence |
-| L1 Model | ECAPA-TDNN (SpeechBrain) | Speaker embeddings (192-dim) |
+| Database | PostgreSQL 15 (Supabase) | Data persistence with RLS |
+| L1 Model | ECAPA-TDNN (SpeechBrain) | 192-dim speaker embeddings |
 | L2 Model | Wav2Vec2 (HuggingFace) | Deepfake detection |
 | ASR Model | Whisper (OpenAI) | Speech-to-text |
-| Audio Processing | soundfile + scipy | 16kHz mono WAV |
+| VR Engine | Rule-based + Pattern | Vishing risk analysis |
+| Encryption | AES-256-GCM | Voiceprint security |
 
 ---
 
 ## Key Features
 
-**High Accuracy**
-- 99.2% genuine user acceptance rate
-- 95.8% deepfake rejection rate
-- 98.1% phrase verification accuracy
-- 0.7% equal error rate (EER)
+### Security
 
-**Security**
-- Zero replay attack vulnerability (single-use HMAC tokens with 90-second TTL)
-- Adaptive voiceprints using exponential moving average (EMA)
-- Four independent security layers with fail-fast design
+- **Multi-Layer Defense:** AD (deepfake) → ASR (phrase) → SV (speaker) → Policy
+- **Fail-Closed Design:** System never fails open
+- **Token Security:** HMAC-SHA256 signed, 90s TTL, single-use
+- **Voiceprint Protection:** AES-256-GCM encryption with tenant-specific keys
+- **Log Redaction:** Automatic PII removal from all logs
+- **Tenant Isolation:** PostgreSQL Row-Level Security
 
-**Production Ready**
-- Docker containerization with multi-stage builds
-- PostgreSQL for production, SQLite for development
-- Comprehensive API documentation via FastAPI/Swagger
-- CORS configuration for cross-origin deployments
+### Performance
+
+- **Parallel Execution:** AD||ASR concurrent processing (~1.1s total vs 1.6s sequential)
+- **Lazy Model Loading:** Models load on first use, not startup
+- **Connection Pooling:** SQLAlchemy pool for database efficiency
+- **Rate Limiting:** Built-in protection against abuse
+
+### Operations
+
+- **Health Checks:** `/v1/health` (liveness) and `/v1/ready` (readiness)
+- **Model Registry:** Version control and quarantine support
+- **Audit Trail:** Complete authentication logging
+- **Consent Management:** GDPR-compliant consent tracking
 
 ---
 
-## Architecture
+## Five-Outcome Policy
 
-The system follows a layered architecture with clear separation of concerns. For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+The centralized PolicyEngine returns one of five decisions:
 
-```
-+------------------------------------------------------------------+
-|                          Client Layer                             |
-|  +------------------+              +------------------+           |
-|  | React Frontend   |              | Audio Recording  |           |
-|  | (Port 5173)      | <----------> | MediaRecorder    |           |
-|  +------------------+              +------------------+           |
-+------------------------------------------------------------------+
-            |
-            | HTTP/REST (multipart/form-data)
-            v
-+------------------------------------------------------------------+
-|                          API Layer                                |
-|  +------------+  +------------+  +------------+  +------------+   |
-|  | /auth/     |  | /auth/     |  | /auth/     |  | /auth/     |   |
-|  | register   |  | enroll     |  | challenge  |  | verify     |   |
-|  +------------+  +------------+  +------------+  +------------+   |
-+------------------------------------------------------------------+
-            |
-            v
-+------------------------------------------------------------------+
-|                       Processing Layer                            |
-|  +----------------+  +----------------+  +----------------+       |
-|  | layer2_        |  | layer3_asr.py  |  | layer1_        |       |
-|  | deepfake.py    |  | (Whisper)      |  | speaker.py     |       |
-|  | (Wav2Vec2)     |  |                |  | (ECAPA-TDNN)   |       |
-|  +----------------+  +----------------+  +----------------+       |
-|                                                                   |
-|  +--------------------------------------------------------+      |
-|  | layer3_adaptive.py                                      |      |
-|  | (Challenge Generation + Token Validation + EMA Update)  |      |
-|  +--------------------------------------------------------+      |
-+------------------------------------------------------------------+
-            |
-            v
-+------------------------------------------------------------------+
-|                      Persistence Layer                            |
-|  +----------+  +-------------+  +------------+  +------------+    |
-|  | users    |  | voiceprints |  | challenges |  | auth_logs  |    |
-|  +----------+  +-------------+  +------------+  +------------+    |
-|                                                                   |
-|                    PostgreSQL / SQLite                            |
-+------------------------------------------------------------------+
-```
+| Decision | Description | Frontend Action |
+|----------|-------------|-----------------|
+| **APPROVE** | All gates passed | Grant access |
+| **DENY** | Authentication failed | Block access, show reason |
+| **STEP_UP** | Marginal confidence | Request fresh challenge |
+| **REVIEW** | Anomaly detected | Queue for human review |
+| **UNAVAILABLE** | Service degraded | Show retry message |
+
+### Risk Levels
+
+| Level | Description |
+|-------|-------------|
+| LOW | Normal authentication |
+| MEDIUM | Minor anomalies detected |
+| HIGH | Significant concern |
+| CRITICAL | Immediate threat (credential harvesting, impersonation) |
 
 ---
 
 ## Security Layers
 
-### Layer 2: Deepfake Detection
+### Layer 2: Deepfake Detection (AAA-AD)
 
-**Purpose:** First line of defense against synthetic and manipulated audio.
-
-| Property | Value |
-|----------|-------|
+| Specification | Value |
+|--------------|-------|
 | Model | `garystafford/wav2vec2-deepfake-voice-detector` |
-| Training Data | ASVspoof 2019 LA dataset |
-| Output | `bonafide` or `spoof` with confidence score |
-| Threshold | Reject if spoof confidence > 0.5 |
+| Output | bonafide / spoof with confidence |
+| Threshold | 0.5 (configurable) |
+| Latency | ~420ms (CPU) |
 
-**Implementation:** [backend/app/layer2_deepfake.py](backend/app/layer2_deepfake.py)
+### ASR: Phrase Verification (AAA-ASR)
 
-### ASR Layer: Phrase Verification
-
-**Purpose:** Ensures the user speaks the correct challenge phrase, preventing replay attacks with pre-recorded audio.
-
-| Property | Value |
-|----------|-------|
+| Specification | Value |
+|--------------|-------|
 | Model | OpenAI Whisper (base) |
-| Comparison | Levenshtein similarity ratio |
-| Threshold | Reject if similarity < 0.6 |
+| Matcher | Deterministic phrase matching |
+| Threshold | 0.6 Levenshtein similarity |
+| Latency | ~800ms (CPU) |
 
-**Implementation:** [backend/app/layer3_asr.py](backend/app/layer3_asr.py)
+### Layer 1: Speaker Verification (AAA-SV)
 
-### Layer 1: Speaker Verification
-
-**Purpose:** Confirms the voice matches the enrolled voiceprint.
-
-| Property | Value |
-|----------|-------|
+| Specification | Value |
+|--------------|-------|
 | Model | `speechbrain/spkrec-ecapa-voxceleb` |
-| Embedding | 192-dimensional vector |
-| Metric | Cosine similarity normalized to [0, 1] |
-| Threshold | Reject if score < 0.5 |
+| Output | 192-dim embedding + cosine similarity |
+| Threshold | 0.5 (configurable) |
+| Latency | ~300ms (CPU) |
 
-**Implementation:** [backend/app/layer1_speaker.py](backend/app/layer1_speaker.py)
+### Vishing Risk Analysis (AAA-VR)
 
-### Layer 3: Challenge-Response
+10 risk indicators with hard-negative detection:
 
-**Purpose:** Prevents token reuse and enables voiceprint adaptation.
-
-| Property | Value |
-|----------|-------|
-| Token Algorithm | HMAC-SHA256 |
-| Token TTL | 90 seconds |
-| Token Usage | Single-use (marked as used after verification) |
-| Voiceprint Update | EMA with alpha = 0.2 |
-
-**EMA Formula:**
-```
-new_voiceprint = 0.8 * old_voiceprint + 0.2 * current_embedding
-```
-
-**Implementation:** [backend/app/layer3_adaptive.py](backend/app/layer3_adaptive.py)
-
----
-
-## Performance Metrics
-
-### Accuracy
-
-| Metric | Value |
-|--------|-------|
-| Genuine User Acceptance | 99.2% |
-| Deepfake Rejection (L2) | 95.8% |
-| Phrase Verification (ASR) | 98.1% |
-| Speaker Verification (L1) | 99.2% |
-| False Rejection Rate (FRR) | 0.8% |
-| False Acceptance Rate (FAR) | 0.6% |
-| Equal Error Rate (EER) | 0.7% |
-
-### Latency
-
-| Layer | Operation | Time |
-|-------|-----------|------|
-| L2 | Deepfake Detection | ~420ms |
-| ASR | Phrase Verification | ~380ms |
-| L1 | Speaker Verification | ~290ms |
-| L3 | Token Validation | ~5ms |
-| **Total** | **End-to-End** | **~1.1s** |
-
-Note: First request incurs 8-12 second cold start for model loading.
+- OTP_SOLICITATION (CRITICAL)
+- CREDENTIAL_HARVESTING_ATTEMPT (CRITICAL)
+- PRESSURE_TACTICS_DETECTED (HIGH)
+- IMPERSONATION_ATTEMPT (HIGH)
+- REMOTE_ACCESS_REQUEST (HIGH)
+- EMOTIONAL_MANIPULATION (HIGH)
+- FINANCIAL_COERCION (HIGH)
+- BYPASS_REQUEST (HIGH)
+- URGENT_TRANSFER_REQUEST (MEDIUM)
+- ACCOUNT_NUMBER_MENTIONED (MEDIUM)
 
 ---
 
@@ -240,7 +202,7 @@ Note: First request incurs 8-12 second cold start for model loading.
 
 - Python 3.11+
 - Node.js 20+
-- PostgreSQL 15+ (or use SQLite for development)
+- Git
 
 ### Installation
 
@@ -255,37 +217,26 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Frontend setup
+# Create config
+cp ../.env.example .env
+# Edit .env: set DEBUG=true
+
+# Start backend
+uvicorn app.main:app --reload --port 8000
+
+# Frontend setup (new terminal)
 cd ../frontend
 npm install
-```
-
-### Configuration
-
-Create `backend/.env`:
-
-```env
-DATABASE_URL=sqlite:///./aaa_engine.db
-SECRET_KEY=your-secret-key-here
-L3_HMAC_SECRET=your-hmac-secret-here
-DEBUG=true
-```
-
-### Running
-
-```bash
-# Terminal 1: Backend (port 8000)
-cd backend
-uvicorn app.main:app --reload
-
-# Terminal 2: Frontend (port 5173)
-cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+### Access
 
-For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
+| URL | Description |
+|-----|-------------|
+| http://localhost:5173 | Frontend UI |
+| http://localhost:8000/docs | API Documentation |
+| http://localhost:8000/v1/health | Health Check |
 
 ---
 
@@ -293,130 +244,109 @@ For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 ```
 AAA_Baselines/
-|
-+-- backend/
-|   +-- app/
-|   |   +-- main.py              # FastAPI application and routes
-|   |   +-- db.py                # Database engine configuration
-|   |   +-- models.py            # SQLAlchemy ORM models
-|   |   +-- layer1_speaker.py    # Speaker verification (ECAPA-TDNN)
-|   |   +-- layer2_deepfake.py   # Deepfake detection (Wav2Vec2)
-|   |   +-- layer3_adaptive.py   # Challenge generation and EMA
-|   |   +-- layer3_asr.py        # Phrase verification (Whisper)
-|   +-- requirements.txt         # Python dependencies
-|   +-- Dockerfile               # Backend container
-|
-+-- frontend/
-|   +-- src/
-|   |   +-- components/          # React page components
-|   |   |   +-- RegisterPage.jsx
-|   |   |   +-- EnrollPage.jsx
-|   |   |   +-- VerifyPage.jsx
-|   |   |   +-- DashboardPage.jsx
-|   |   +-- api.js               # Backend API client
-|   |   +-- App.jsx              # Application router
-|   +-- package.json             # Node.js dependencies
-|   +-- Dockerfile               # Frontend container
-|
-+-- docs/
-|   +-- DB_SCHEMA.sql            # Database schema reference
-|   +-- TEAM_CONTRACT.md         # Development team contract
-|
-+-- docker-compose.yml           # Multi-container orchestration
-+-- Dockerfile                   # Full-stack container
-+-- render.yaml                  # Render deployment config
-+-- ARCHITECTURE.md              # Technical architecture
-+-- INSTALLATION.md              # Setup instructions
-+-- CONTRIBUTING.md              # Contribution guidelines
-+-- CHANGELOG.md                 # Version history
-+-- DEMO.md                      # Demo walkthrough
-+-- LICENSE                      # MIT License
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/              # REST endpoints
+│   │   │   ├── health.py        # /v1/health, /v1/ready
+│   │   │   ├── challenges.py    # /v1/challenges
+│   │   │   ├── verify.py        # /v1/verify
+│   │   │   ├── enroll.py        # /v1/enroll
+│   │   │   ├── risk.py          # /v1/risk/transcript
+│   │   │   └── consent.py       # /v1/consent
+│   │   ├── core/
+│   │   │   ├── config.py        # Settings management
+│   │   │   ├── policy_engine.py # Five-outcome decisions
+│   │   │   ├── ratelimit.py     # Rate limiting
+│   │   │   └── logging.py       # Log redaction
+│   │   ├── security/
+│   │   │   ├── jwt_auth.py      # JWT + CORS
+│   │   │   ├── voiceprint_crypto.py  # AES-256-GCM
+│   │   │   └── host_auth.py     # Host app policy
+│   │   ├── adapters/
+│   │   │   └── vr.py            # Vishing risk analysis
+│   │   ├── aaa_asr/
+│   │   │   └── phrase_matcher.py  # Deterministic matching
+│   │   ├── layer1_speaker.py    # ECAPA-TDNN
+│   │   ├── layer2_deepfake.py   # Wav2Vec2
+│   │   ├── layer3_asr.py        # Whisper
+│   │   ├── layer3_adaptive.py   # Challenge + EMA
+│   │   ├── models.py            # SQLAlchemy models
+│   │   ├── db.py                # Database config
+│   │   └── main.py              # FastAPI app
+│   ├── tests/                   # 437 tests
+│   └── requirements.txt
+├── frontend/                    # Main React frontend
+├── apps/
+│   ├── banking_shield/          # Banking host app demo
+│   └── callguard/               # Call center host app demo
+├── docs/                        # Documentation
+├── .env.example                 # Configuration template
+├── docker-compose.yml           # Docker deployment
+├── ARCHITECTURE.md              # Technical architecture
+├── SECURITY.md                  # Security documentation
+├── INSTALLATION.md              # Setup guide
+└── README.md                    # This file
 ```
 
 ---
 
 ## API Reference
 
-Base URL: `http://localhost:8000`
+### Core Endpoints
 
-Interactive documentation: `http://localhost:8000/docs`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/health` | GET | Liveness check |
+| `/v1/ready` | GET | Readiness check (models, DB) |
+| `/v1/challenges` | POST | Generate challenge phrase |
+| `/v1/verify` | POST | Verify voice authentication |
+| `/v1/enroll` | POST | Enroll voiceprint |
+| `/v1/risk/transcript` | POST | Analyze transcript for vishing |
 
-### Endpoints
+### Response Format
 
-#### POST /auth/register
-
-Register a new user.
-
-**Request:**
 ```json
 {
-  "name": "John Doe",
-  "email": "john@example.com"
-}
-```
-
-**Response:**
-```json
-{
-  "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
-
-#### POST /auth/enroll
-
-Enroll a voice sample for the user.
-
-**Request:** `multipart/form-data`
-- `user_id`: User UUID
-- `audio`: WAV file (16kHz mono recommended)
-
-**Response:**
-```json
-{
-  "status": "enrolled",
-  "sample_count": 3
-}
-```
-
-#### GET /auth/challenge
-
-Request an authentication challenge.
-
-**Request:** `?user_id=<uuid>`
-
-**Response:**
-```json
-{
-  "phrase": "blue sky mountain river",
-  "token": "eyJ0eXAiOiJKV1Q...",
-  "expires_at": "2024-01-15T14:32:45Z"
-}
-```
-
-#### POST /auth/verify
-
-Verify authentication attempt.
-
-**Request:** `multipart/form-data`
-- `user_id`: User UUID
-- `token`: Challenge token
-- `audio`: WAV file with spoken phrase
-
-**Response:**
-```json
-{
-  "result": "ACCEPT",
-  "confidence": 0.87,
-  "layer_blocked": null,
+  "request_id": "uuid",
+  "decision": "APPROVE | DENY | STEP_UP | REVIEW | UNAVAILABLE",
   "session_id": "uuid",
-  "reason": "Authentication successful",
-  "l2_label": "bonafide",
-  "l2_confidence": 0.94,
-  "l1_score": 0.87,
-  "asr_transcript": "blue sky mountain river",
-  "asr_similarity": 0.98
+  "reason": "Human-readable reason",
+  "reason_public": "Safe public reason code",
+  "risk_level": "LOW | MEDIUM | HIGH | CRITICAL",
+  "requires_fresh_challenge": false,
+  "requires_human_review": false
 }
 ```
+
+### Rate Limits
+
+| Endpoint | Limit |
+|----------|-------|
+| `/v1/challenges` | 10/minute |
+| `/v1/verify` | 5/minute |
+| `/v1/enroll` | 3/5minutes |
+
+---
+
+## Host Applications
+
+### Banking Shield (Port 3000)
+
+Banking sector demo with high-security policy tier:
+- Voice authentication for high-value transactions
+- Vishing detection integration
+- Audit logging
+
+### CallGuard (Port 5174)
+
+Call center demo with real-time protection:
+- Live transcript analysis
+- Risk indicator display
+- STEP_UP workflow support
+
+### AAA-Controlled Capture
+
+Both host apps use the iframe pattern - audio is captured and uploaded directly to AAA, never passing through the host application.
 
 ---
 
@@ -424,49 +354,83 @@ Verify authentication attempt.
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | Database connection string | `sqlite:///./aaa_engine.db` |
-| `SECRET_KEY` | Application secret key | Required |
-| `L3_HMAC_SECRET` | HMAC secret for token signing | Required |
-| `DEBUG` | Enable debug mode | `false` |
+See [.env.example](.env.example) for complete reference.
 
-### Thresholds
-
-Thresholds are configured in `backend/app/main.py`:
-
-```python
-L2_SPOOF_THRESHOLD = 0.5      # Deepfake rejection threshold
-L1_SIMILARITY_THRESHOLD = 0.5  # Speaker matching threshold
-ASR_PHRASE_THRESHOLD = 0.6     # Phrase similarity threshold
+**Required:**
+```bash
+DATABASE_URL=postgresql://...
+AAA_JWT_SECRET=<32+ chars>
+L3_HMAC_SECRET=<32+ chars>
+ALLOWED_ORIGINS=http://localhost:5173,...
 ```
+
+**Optional:**
+```bash
+L2_SPOOF_THRESHOLD=0.5
+L1_SIMILARITY_THRESHOLD=0.5
+ASR_PHRASE_THRESHOLD=0.6
+WHISPER_MODEL=base
+DEBUG=false
+```
+
+---
+
+## Testing
+
+```bash
+cd backend
+source venv/bin/activate
+
+# Run all tests
+pytest
+
+# With coverage
+pytest --cov=app
+
+# Verbose
+pytest -v
+
+# Specific test
+pytest tests/test_api_v1.py -v
+```
+
+**Current Status:** 437 tests passing
+
+Test categories:
+- `test_api_v1.py` - API endpoint tests
+- `test_policy_engine.py` - Five-outcome decision tests
+- `test_tenant_isolation.py` - RLS security tests
+- `test_log_redaction.py` - PII redaction tests
+- `test_vr_hard_negatives.py` - Vishing detection tests
+- `test_voiceprint_crypto.py` - Encryption tests
 
 ---
 
 ## Deployment
 
-### Docker (Recommended)
+### Development
 
 ```bash
-# Build and run
-docker-compose up -d
+# Backend
+uvicorn app.main:app --reload --port 8000
 
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
+# Frontend
+npm run dev
 ```
 
-### Render
+### Production
 
-The repository includes `render.yaml` for one-click deployment on Render.
+See [INSTALLATION.md](INSTALLATION.md) for detailed deployment guides:
+- Render (recommended)
+- Railway
+- Docker
+- Manual VPS
 
-1. Connect your GitHub repository to Render
-2. Render will auto-detect the configuration
-3. Set environment variables in Render dashboard
+### Docker
 
-For detailed deployment instructions, see [INSTALLATION.md](INSTALLATION.md).
+```bash
+docker-compose up -d
+```
 
 ---
 
@@ -474,36 +438,19 @@ For detailed deployment instructions, see [INSTALLATION.md](INSTALLATION.md).
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design and technical details |
-| [INSTALLATION.md](INSTALLATION.md) | Setup and deployment guide |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [SECURITY.md](SECURITY.md) | Security policy and vulnerability reporting |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [DEMO.md](DEMO.md) | Demo walkthrough with examples |
-| [docs/DB_SCHEMA.sql](docs/DB_SCHEMA.sql) | Database schema |
-
----
-
-## Contributing
-
-We welcome contributions. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
-
-- Code style and standards
-- Commit message format
-- Pull request process
-- Testing requirements
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture and data flow |
+| [SECURITY.md](SECURITY.md) | Security model and threat analysis |
+| [INSTALLATION.md](INSTALLATION.md) | Complete setup guide |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development guidelines |
+| [docs/operations/](docs/operations/) | Backup, restore, quarantine procedures |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## Acknowledgments
-
-- [SpeechBrain](https://speechbrain.github.io/) for ECAPA-TDNN speaker verification
-- [Hugging Face](https://huggingface.co/) for Wav2Vec2 deepfake detection model
-- [OpenAI](https://openai.com/) for Whisper ASR model
-- [ASVspoof Challenge](https://www.asvspoof.org/) for deepfake detection datasets
+**AAA Engine v1.0.0**  
+**Last Updated:** November 2026

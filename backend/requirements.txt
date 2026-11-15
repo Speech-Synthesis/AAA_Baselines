@@ -1,43 +1,92 @@
+# ============================================================================
 # AAA Engine Backend Dependencies
+# Adaptive Audio Authentication with Deepfake Detection
+# ============================================================================
+# Python 3.11+ required
+# Install: pip install -r requirements.txt
+# ============================================================================
 
-# Web framework
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
+# =============================================================================
+# CORE WEB FRAMEWORK
+# =============================================================================
+fastapi>=0.104.0                    # Async REST API framework
+uvicorn[standard]>=0.24.0           # ASGI server with WebSocket support
+python-multipart>=0.0.6             # File upload handling (audio files)
 
-# Database
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.9
+# =============================================================================
+# DATABASE
+# =============================================================================
+sqlalchemy>=2.0.0                   # ORM with async support
+psycopg2-binary>=2.9.9              # PostgreSQL adapter (Supabase/Neon)
+# Note: SQLite is built-in for development; PostgreSQL for production
 
-# ML Core
-torch>=2.1.0
-numpy>=1.24.0
+# =============================================================================
+# MACHINE LEARNING CORE
+# =============================================================================
+torch>=2.1.0                        # PyTorch - neural network runtime
+numpy>=1.24.0                       # Numerical computing
 
-# Layer 1 - Speaker Verification (ECAPA-TDNN)
-speechbrain>=1.0.0
+# =============================================================================
+# LAYER 1 - SPEAKER VERIFICATION (AAA-SV)
+# Model: speechbrain/spkrec-ecapa-voxceleb
+# Output: 192-dimensional speaker embeddings
+# =============================================================================
+speechbrain>=1.0.0                  # ECAPA-TDNN speaker recognition
 
-# Layer 2 - Deepfake Detection (Wav2Vec2)
-transformers>=4.35.0
+# =============================================================================
+# LAYER 2 - DEEPFAKE DETECTION (AAA-AD)
+# Model: garystafford/wav2vec2-deepfake-voice-detector
+# Output: bonafide/spoof classification with confidence
+# =============================================================================
+transformers>=4.35.0                # HuggingFace Transformers (Wav2Vec2)
 
-# Audio processing (using soundfile - no FFmpeg needed)
-soundfile>=0.12.1
-scipy>=1.10.0
+# =============================================================================
+# LAYER 3 - SPEECH-TO-TEXT (AAA-ASR)
+# Model: OpenAI Whisper (base - 74M parameters)
+# Output: Transcription for phrase verification
+# =============================================================================
+openai-whisper>=20231117            # Whisper ASR
 
-# Layer 3 - Speech-to-Text (Whisper ASR)
-openai-whisper>=20231117
+# =============================================================================
+# AUDIO PROCESSING
+# No FFmpeg required - pure Python audio handling
+# =============================================================================
+soundfile>=0.12.1                   # WAV file I/O (libsndfile wrapper)
+scipy>=1.10.0                       # Signal processing (resampling)
+librosa>=0.10.0                     # Audio analysis (fallback decoder)
 
-# Utilities
-python-dotenv>=1.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.0.0
-huggingface-hub>=0.20.0
-python-jose[cryptography]>=3.3.0
-cryptography>=41.0.0
+# =============================================================================
+# SECURITY & AUTHENTICATION
+# =============================================================================
+python-jose[cryptography]>=3.3.0    # JWT token handling (RS256/HS256)
+cryptography>=41.0.0                # AES-256-GCM voiceprint encryption
+passlib>=1.7.4                      # Password hashing utilities
 
-# Rate limiting
-slowapi>=0.1.9
+# =============================================================================
+# CONFIGURATION & UTILITIES
+# =============================================================================
+python-dotenv>=1.0.0                # Environment variable loading (.env)
+pydantic>=2.5.0                     # Data validation and serialization
+pydantic-settings>=2.0.0            # Settings management with env vars
+huggingface-hub>=0.20.0             # Model downloading from HuggingFace
 
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-httpx>=0.25.0
+# =============================================================================
+# RATE LIMITING & API PROTECTION
+# =============================================================================
+slowapi>=0.1.9                      # Rate limiting middleware
+
+# =============================================================================
+# TESTING
+# =============================================================================
+pytest>=7.4.0                       # Test framework
+pytest-asyncio>=0.21.0              # Async test support
+httpx>=0.25.0                       # Async HTTP client for API tests
+pytest-cov>=4.0.0                   # Coverage reporting
+
+# =============================================================================
+# CODE QUALITY (Development)
+# =============================================================================
+# Uncomment for development:
+# ruff>=0.1.0                       # Fast Python linter
+# black>=23.0.0                     # Code formatter
+# mypy>=1.0.0                       # Static type checking
