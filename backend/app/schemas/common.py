@@ -71,10 +71,22 @@ class SecurityChecks(BaseModel):
     rate_limiting: CheckStatus = CheckStatus.ERROR
 
 
+class PoolStatus(BaseModel):
+    """Database connection pool status."""
+
+    type: str = "unknown"
+    pooled: bool = False
+    size: int | None = None
+    checked_in: int | None = None
+    checked_out: int | None = None
+    overflow: int | None = None
+
+
 class ReadinessChecks(BaseModel):
     """All readiness checks."""
 
     database: CheckStatus = CheckStatus.ERROR
+    pool: PoolStatus = Field(default_factory=PoolStatus)
     models: ModelChecks = Field(default_factory=ModelChecks)
     security: SecurityChecks = Field(default_factory=SecurityChecks)
     configuration: CheckStatus = CheckStatus.ERROR

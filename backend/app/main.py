@@ -14,14 +14,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import v1 API router and security routers
 from .api.v1 import router as v1_router
 from .core.config import get_settings
+from .core.exceptions import AAAEngineError
 from .core.ratelimit import RateLimitExceeded, limiter, rate_limit_exceeded_handler
 from .db import Base, engine, get_db
 from .layer1_speaker import enroll_speaker, verify_speaker
@@ -48,6 +50,42 @@ app = FastAPI(
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+
+# Global exception handler for AAA Engine errors
+@app.exception_handler(AAAEngineError)
+async def aaa_engine_exception_handler(request: Request, exc: AAAEngineError) -> JSONResponse:
+    """Convert AAAEngineError to standardized JSON response."""
+    status_code = 400
+    if exc.code == "not_found":
+        status_code = 404
+    elif exc.code == "unauthorized":
+        status_code = 401
+    elif exc.code in ("model_unavailable", "model_timeout"):
+        status_code = 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": exc.code,
+            "message": exc.message,
+            "request_id": request.headers.get("X-Request-ID", str(uuid.uuid4())),
+        },
+    )
+
+
+# Request ID middleware for tracing
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Add request ID to all requests for tracing."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
+app.add_middleware(RequestIDMiddleware)
 
 # Include security & v1 API routers
 app.include_router(jwt_auth_router)

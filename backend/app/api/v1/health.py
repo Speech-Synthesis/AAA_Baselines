@@ -13,12 +13,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings, validate_production_config
-from ...db import get_db
+from ...db import get_db, get_pool_status
 from ...schemas.common import (
     CheckStatus,
     HealthResponse,
     ModelChecks,
     ModelStatus,
+    PoolStatus,
     ReadinessChecks,
     ReadinessResponse,
     SecurityChecks,
@@ -62,6 +63,13 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
     except Exception:
         checks.database = CheckStatus.ERROR
         all_ready = False
+
+    # Check connection pool status
+    try:
+        pool_info = get_pool_status()
+        checks.pool = PoolStatus(**pool_info)
+    except Exception:
+        checks.pool = PoolStatus(type="unknown", pooled=False)
 
     # Check configuration
     config_errors = validate_production_config()
