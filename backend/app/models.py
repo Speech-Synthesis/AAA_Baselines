@@ -68,6 +68,9 @@ class JSONEncodedList(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         if value is not None:
+            # PostgreSQL JSONB returns native Python objects, not strings
+            if isinstance(value, (list, dict)):
+                return value
             return json.loads(value)
         return value
 
