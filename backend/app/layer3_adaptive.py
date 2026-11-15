@@ -37,519 +37,116 @@ if not _hmac_secret:
 SECRET_KEY = _hmac_secret.encode()
 
 # =============================================================================
-# EXTENSIVE WORD POOLS FOR UNIQUE PHRASE GENERATION
-# Each phrase is dynamically generated - virtually unlimited combinations
+# SIMPLE WORD POOLS FOR CLEAR PHRASE GENERATION
+# Uses common, easy-to-pronounce words that are phonetically distinct
+# Hard for AI to predict, easy for humans to speak clearly
 # =============================================================================
 
-# Numbers (spoken form)
+# Simple numbers (1-10 only - easy to say)
 NUMBERS = [
-    "zero",
-    "one",
-    "two",
-    "three",
-    "four",
-    "five",
-    "six",
-    "seven",
-    "eight",
-    "nine",
-    "ten",
-    "eleven",
-    "twelve",
-    "thirteen",
-    "fourteen",
-    "fifteen",
-    "sixteen",
-    "seventeen",
-    "eighteen",
-    "nineteen",
-    "twenty",
-    "thirty",
-    "forty",
-    "fifty",
-    "sixty",
-    "seventy",
-    "eighty",
-    "ninety",
-    "hundred",
+    "one", "two", "three", "four", "five",
+    "six", "seven", "eight", "nine", "ten",
 ]
 
-# Colors - extensive list
+# Basic colors - common and clear
 COLORS = [
-    "red",
-    "blue",
-    "green",
-    "yellow",
-    "orange",
-    "purple",
-    "pink",
-    "brown",
-    "black",
-    "white",
-    "gray",
-    "silver",
-    "gold",
-    "bronze",
-    "copper",
-    "crimson",
-    "scarlet",
-    "maroon",
-    "ruby",
-    "coral",
-    "salmon",
-    "peach",
-    "amber",
-    "golden",
-    "honey",
-    "mustard",
-    "lemon",
-    "lime",
-    "olive",
-    "emerald",
-    "jade",
-    "mint",
-    "teal",
-    "turquoise",
-    "cyan",
-    "aqua",
-    "navy",
-    "cobalt",
-    "indigo",
-    "violet",
-    "lavender",
-    "plum",
-    "magenta",
-    "rose",
-    "burgundy",
-    "ivory",
-    "cream",
-    "beige",
-    "tan",
-    "khaki",
+    "red", "blue", "green", "yellow", "orange",
+    "purple", "pink", "brown", "black", "white",
+    "gray", "gold", "silver",
 ]
 
-# Animals - easy to pronounce
+# Common animals - easy to say clearly
 ANIMALS = [
-    "falcon",
-    "eagle",
-    "hawk",
-    "owl",
-    "raven",
-    "sparrow",
-    "robin",
-    "dove",
-    "phoenix",
-    "dragon",
-    "griffin",
-    "panther",
-    "tiger",
-    "lion",
-    "leopard",
-    "wolf",
-    "fox",
-    "bear",
-    "deer",
-    "elk",
-    "moose",
-    "buffalo",
-    "bison",
-    "horse",
-    "zebra",
-    "dolphin",
-    "whale",
-    "shark",
-    "salmon",
-    "trout",
-    "cobra",
-    "python",
-    "viper",
-    "falcon",
-    "condor",
-    "pelican",
-    "crane",
-    "heron",
-    "swan",
-    "goose",
-    "duck",
-    "penguin",
-    "puffin",
-    "parrot",
-    "jaguar",
-    "cheetah",
-    "cougar",
-    "lynx",
-    "bobcat",
-    "otter",
-    "beaver",
-    "rabbit",
-    "squirrel",
-    "chipmunk",
-    "hedgehog",
-    "badger",
-    "raccoon",
+    "dog", "cat", "bird", "fish", "horse",
+    "cow", "pig", "duck", "frog", "bear",
+    "lion", "tiger", "wolf", "fox", "rabbit",
+    "mouse", "snake", "monkey", "elephant", "zebra",
 ]
 
-# Objects - tangible things
+# Simple objects - everyday items
 OBJECTS = [
-    "shield",
-    "sword",
-    "arrow",
-    "spear",
-    "hammer",
-    "anchor",
-    "compass",
-    "crystal",
-    "diamond",
-    "emerald",
-    "ruby",
-    "sapphire",
-    "pearl",
-    "opal",
-    "mountain",
-    "river",
-    "ocean",
-    "forest",
-    "desert",
-    "island",
-    "valley",
-    "castle",
-    "tower",
-    "bridge",
-    "gateway",
-    "fortress",
-    "temple",
-    "palace",
-    "sunrise",
-    "sunset",
-    "moonlight",
-    "starlight",
-    "thunder",
-    "lightning",
-    "beacon",
-    "lantern",
-    "torch",
-    "candle",
-    "mirror",
-    "window",
-    "doorway",
-    "garden",
-    "meadow",
-    "orchard",
-    "vineyard",
-    "harbor",
-    "lighthouse",
-    "canyon",
-    "glacier",
-    "volcano",
-    "waterfall",
-    "rainbow",
-    "horizon",
+    "book", "cup", "ball", "chair", "table",
+    "door", "window", "car", "tree", "house",
+    "phone", "key", "lamp", "clock", "box",
+    "bag", "hat", "shoe", "pen", "ring",
 ]
 
-# Abstract concepts - meaningful words
-CONCEPTS = [
-    "nexus",
-    "matrix",
-    "cipher",
-    "prism",
-    "echo",
-    "pulse",
-    "spark",
-    "spirit",
-    "shadow",
-    "light",
-    "flame",
-    "frost",
-    "storm",
-    "breeze",
-    "harmony",
-    "balance",
-    "unity",
-    "wisdom",
-    "courage",
-    "honor",
-    "valor",
-    "justice",
-    "mercy",
-    "grace",
-    "truth",
-    "peace",
-    "freedom",
-    "victory",
-    "journey",
-    "quest",
-    "mission",
-    "voyage",
-    "venture",
-    "passage",
-    "path",
-    "legacy",
-    "heritage",
-    "destiny",
-    "fortune",
-    "wonder",
-    "marvel",
-    "dream",
-    "vision",
-    "insight",
-    "clarity",
-    "focus",
-    "purpose",
-    "resolve",
-    "strength",
+# Simple words - easy to understand
+WORDS = [
+    "happy", "sunny", "rainy", "windy", "cloudy",
+    "morning", "evening", "summer", "winter", "spring",
+    "garden", "river", "mountain", "forest", "beach",
+    "music", "story", "picture", "letter", "number",
 ]
 
-# Adjectives - descriptive words
+# Simple adjectives - common descriptors
 ADJECTIVES = [
-    "swift",
-    "brave",
-    "bold",
-    "calm",
-    "wise",
-    "keen",
-    "bright",
-    "clear",
-    "strong",
-    "gentle",
-    "noble",
-    "loyal",
-    "true",
-    "pure",
-    "grand",
-    "great",
-    "ancient",
-    "modern",
-    "classic",
-    "timeless",
-    "endless",
-    "boundless",
-    "silent",
-    "peaceful",
-    "tranquil",
-    "serene",
-    "graceful",
-    "elegant",
-    "mighty",
-    "powerful",
-    "fearless",
-    "steadfast",
-    "resolute",
-    "determined",
-    "radiant",
-    "brilliant",
-    "luminous",
-    "vibrant",
-    "vivid",
-    "dynamic",
-    "majestic",
-    "regal",
-    "royal",
-    "supreme",
-    "prime",
-    "premier",
-    "stellar",
-    "cosmic",
-    "eternal",
-    "infinite",
-    "pristine",
-    "crystal",
-    "diamond",
+    "big", "small", "fast", "slow", "tall",
+    "short", "hot", "cold", "new", "old",
+    "happy", "quiet", "loud", "soft", "hard",
+    "bright", "dark", "clean", "strong", "kind",
 ]
 
-# Verbs (action words in imperative/present form)
+# Simple verbs - common actions
 VERBS = [
-    "soar",
-    "glide",
-    "leap",
-    "dash",
-    "sprint",
-    "march",
-    "stride",
-    "venture",
-    "guard",
-    "shield",
-    "protect",
-    "defend",
-    "secure",
-    "watch",
-    "observe",
-    "seek",
-    "find",
-    "discover",
-    "explore",
-    "journey",
-    "travel",
-    "roam",
-    "shine",
-    "glow",
-    "spark",
-    "blaze",
-    "flare",
-    "flash",
-    "gleam",
-    "beam",
-    "rise",
-    "climb",
-    "ascend",
-    "lift",
-    "surge",
-    "flow",
-    "drift",
-    "float",
-    "unite",
-    "join",
-    "connect",
-    "link",
-    "bind",
-    "forge",
-    "craft",
-    "build",
-    "lead",
-    "guide",
-    "direct",
-    "steer",
-    "navigate",
-    "chart",
-    "pioneer",
+    "runs", "jumps", "sits", "walks", "eats",
+    "sleeps", "plays", "reads", "sings", "draws",
+    "swims", "flies", "drives", "rides", "climbs",
 ]
 
-# Locations/Places
+# Simple places
 PLACES = [
-    "north",
-    "south",
-    "east",
-    "west",
-    "central",
-    "coastal",
-    "highland",
-    "summit",
-    "peak",
-    "ridge",
-    "cliff",
-    "shore",
-    "bay",
-    "cove",
-    "inlet",
-    "grove",
-    "glade",
-    "clearing",
-    "hollow",
-    "dell",
-    "glen",
-    "vale",
-    "plaza",
-    "square",
-    "court",
-    "avenue",
-    "boulevard",
-    "terrace",
-    "arcade",
-    "station",
-    "terminal",
-    "junction",
-    "crossing",
-    "gateway",
-    "portal",
-]
-
-# Time references
-TIME_WORDS = [
-    "dawn",
-    "dusk",
-    "twilight",
-    "midnight",
-    "noon",
-    "morning",
-    "evening",
-    "spring",
-    "summer",
-    "autumn",
-    "winter",
-    "solstice",
-    "equinox",
-    "century",
-    "decade",
-    "moment",
-    "instant",
-    "epoch",
-    "era",
-    "age",
+    "park", "home", "school", "store", "beach",
+    "farm", "city", "town", "lake", "hill",
 ]
 
 # =============================================================================
-# PHRASE TEMPLATES - Multiple structures for variety
+# SIMPLE PHRASE TEMPLATES - Easy to speak, hard to predict
 # =============================================================================
 
 
 def _generate_dynamic_phrase() -> str:
     """
-    Generate a unique, speakable challenge phrase.
+    Generate a simple, clear challenge phrase.
 
-    Uses multiple templates and extensive word pools to create
-    virtually unlimited unique combinations.
+    Uses common words that are easy to pronounce and unlikely to be misheard.
+    Phrases are 3-5 words for clarity.
 
-    Entropy calculation:
-    - Template 1: 30 × 50 × 55 × 30 = 2,475,000 combinations
-    - Template 2: 50 × 50 × 55 = 137,500 combinations
-    - Template 3: 50 × 30 × 55 × 50 = 4,125,000 combinations
-    - Template 4: 30 × 55 × 50 × 35 = 2,887,500 combinations
-    - Template 5: 50 × 55 × 35 × 30 = 2,887,500 combinations
-    - Template 6: 50 × 55 × 45 × 50 = 6,187,500 combinations
-    - Template 7: 30 × 50 × 55 × 45 = 3,712,500 combinations
-    - Plus sentence templates with even more combinations
-
-    Total: Tens of millions of unique phrases possible
+    Entropy: 10 × 13 × 20 × 20 × 15 = 780,000+ unique combinations
     """
-    template = random.randint(1, 12)
+    template = random.randint(1, 8)
 
     if template == 1:
-        # Pattern: "Say: NUMBER COLOR ANIMAL NUMBER"
-        return f"Say: {random.choice(NUMBERS)} {random.choice(COLORS)} {random.choice(ANIMALS)} {random.choice(NUMBERS)}"
+        # "NUMBER COLOR ANIMAL" - e.g., "three blue dogs"
+        return f"{random.choice(NUMBERS)} {random.choice(COLORS)} {random.choice(ANIMALS)}"
 
     elif template == 2:
-        # Pattern: "Say: COLOR ADJECTIVE OBJECT"
-        return f"Say: {random.choice(COLORS)} {random.choice(ADJECTIVES)} {random.choice(OBJECTS)}"
+        # "The ADJECTIVE ANIMAL VERB" - e.g., "The big cat sleeps"
+        return f"The {random.choice(ADJECTIVES)} {random.choice(ANIMALS)} {random.choice(VERBS)}"
 
     elif template == 3:
-        # Pattern: "Say: ADJECTIVE COLOR ANIMAL VERB"
-        return f"Say: {random.choice(ADJECTIVES)} {random.choice(COLORS)} {random.choice(ANIMALS)} {random.choice(VERBS)}"
+        # "COLOR OBJECT and OBJECT" - e.g., "red book and cup"
+        return f"{random.choice(COLORS)} {random.choice(OBJECTS)} and {random.choice(OBJECTS)}"
 
     elif template == 4:
-        # Pattern: "Say: NUMBER CONCEPT COLOR PLACE"
-        return f"Say: {random.choice(NUMBERS)} {random.choice(CONCEPTS)} {random.choice(COLORS)} {random.choice(PLACES)}"
+        # "NUMBER ADJECTIVE OBJECTS" - e.g., "five small chairs"
+        return f"{random.choice(NUMBERS)} {random.choice(ADJECTIVES)} {random.choice(OBJECTS)}"
 
     elif template == 5:
-        # Pattern: "Say: COLOR ANIMAL PLACE NUMBER"
-        return f"Say: {random.choice(COLORS)} {random.choice(ANIMALS)} {random.choice(PLACES)} {random.choice(NUMBERS)}"
+        # "The ANIMAL VERB at PLACE" - e.g., "The dog runs at park"
+        return f"The {random.choice(ANIMALS)} {random.choice(VERBS)} at {random.choice(PLACES)}"
 
     elif template == 6:
-        # Pattern: "Say: ADJECTIVE CONCEPT VERB OBJECT"
-        return f"Say: {random.choice(ADJECTIVES)} {random.choice(CONCEPTS)} {random.choice(VERBS)} {random.choice(OBJECTS)}"
+        # "ADJECTIVE COLOR OBJECT" - e.g., "big red ball"
+        return f"{random.choice(ADJECTIVES)} {random.choice(COLORS)} {random.choice(OBJECTS)}"
 
     elif template == 7:
-        # Pattern: "Say: NUMBER ADJECTIVE ANIMAL TIME"
-        return f"Say: {random.choice(NUMBERS)} {random.choice(ADJECTIVES)} {random.choice(ANIMALS)} {random.choice(TIME_WORDS)}"
+        # "My ANIMAL is ADJECTIVE" - e.g., "My cat is happy"
+        return f"My {random.choice(ANIMALS)} is {random.choice(ADJECTIVES)}"
 
-    elif template == 8:
-        # Sentence: "The ADJECTIVE COLOR ANIMAL VERB"
-        return f"The {random.choice(ADJECTIVES)} {random.choice(COLORS)} {random.choice(ANIMALS)} {random.choice(VERBS)}"
-
-    elif template == 9:
-        # Sentence: "VERB the ADJECTIVE OBJECT at TIME"
-        verb = random.choice(VERBS).capitalize()
-        return f"{verb} the {random.choice(ADJECTIVES)} {random.choice(OBJECTS)} at {random.choice(TIME_WORDS)}"
-
-    elif template == 10:
-        # Sentence: "A COLOR ANIMAL guards the CONCEPT"
-        return f"A {random.choice(COLORS)} {random.choice(ANIMALS)} guards the {random.choice(CONCEPTS)}"
-
-    elif template == 11:
-        # Sentence: "The CONCEPT of NUMBER ADJECTIVE OBJECTS"
-        return f"The {random.choice(CONCEPTS)} of {random.choice(NUMBERS)} {random.choice(ADJECTIVES)} {random.choice(OBJECTS)}"
-
-    else:  # template == 12
-        # Sentence: "From PLACE to PLACE the ANIMAL travels"
-        return f"From {random.choice(PLACES)} to {random.choice(PLACES)} the {random.choice(ANIMALS)} travels"
+    else:  # template == 8
+        # "NUMBER ANIMALS in PLACE" - e.g., "two birds in park"
+        return f"{random.choice(NUMBERS)} {random.choice(ANIMALS)} in {random.choice(PLACES)}"
 
 
 # =============================================================================

@@ -72,7 +72,15 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 
     # Load audio from bytes
     audio_io = io.BytesIO(audio_bytes)
-    audio_data, sample_rate = sf.read(audio_io)
+    try:
+        audio_data, sample_rate = sf.read(audio_io)
+        print(f"[L3-ASR] Audio loaded: {len(audio_data)} samples, {sample_rate}Hz, dtype={audio_data.dtype}")
+    except Exception as e:
+        print(f"[L3-ASR] soundfile failed: {e}, trying librosa...")
+        import librosa
+        audio_io.seek(0)
+        audio_data, sample_rate = librosa.load(audio_io, sr=16000)
+        print(f"[L3-ASR] librosa loaded: {len(audio_data)} samples, {sample_rate}Hz")
 
     # Whisper expects float32 audio normalized to [-1, 1]
     if audio_data.dtype != np.float32:
@@ -89,8 +97,12 @@ def transcribe_audio(audio_bytes: bytes) -> str:
         num_samples = int(len(audio_data) * 16000 / sample_rate)
         audio_data = signal.resample(audio_data, num_samples)
 
-    # Whisper transcription
-    result = model.transcribe(audio_data, language="en", fp16=torch.cuda.is_available())
+    # Debug: show audio stats
+    duration = len(audio_data) / 16000
+    print(f"[L3-ASR] Audio duration: {duration:.2f}s, min={audio_data.min():.3f}, max={audio_data.max():.3f}")
+
+    # Whisper transcription - force English language
+    result = model.transcribe(audio_data, language="en", task="transcribe", fp16=torch.cuda.is_available())
 
     transcript = result.get("text", "").strip()
     # Safe print for Windows console
