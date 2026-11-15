@@ -334,11 +334,12 @@ class PhraseVerifier:
 
         # Check audio duration if provided
         if audio_duration is not None and audio_duration < self.MIN_AUDIO_DURATION:
+            min_dur = self.MIN_AUDIO_DURATION
             return PhraseResult(
                 code="TOO_SHORT",
                 match=False,
                 hypothesis=transcript,
-                reason=f"Audio too short ({audio_duration:.1f}s). Minimum {self.MIN_AUDIO_DURATION}s required.",
+                reason=f"Audio too short ({audio_duration:.1f}s). Minimum {min_dur}s required.",
             )
 
         # Check no-speech probability if provided
@@ -347,7 +348,7 @@ class PhraseVerifier:
                 code="NO_SPEECH",
                 match=False,
                 hypothesis=transcript,
-                reason=f"High no-speech probability ({no_speech_prob:.2f}). No valid speech detected.",
+                reason=f"High no-speech probability ({no_speech_prob:.2f}). No speech detected.",
             )
 
         # ------- Normalization -------

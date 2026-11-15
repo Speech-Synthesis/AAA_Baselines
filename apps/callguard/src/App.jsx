@@ -1,14 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AgentLogin from './pages/AgentLogin';
 import Dashboard from './pages/Dashboard';
 import ActiveCall from './pages/ActiveCall';
 import { demoAgents, demoCalls, demoAuditLogs } from './data/mockData';
+import { checkAAAHealth } from './services/api';
 
 export default function App() {
   const [currentAgent, setCurrentAgent] = useState(demoAgents[0]); // Default signed in for convenience
   const [activeCall, setActiveCall] = useState(null);
   const [calls, setCalls] = useState(demoCalls);
   const [auditLogs, setAuditLogs] = useState(demoAuditLogs);
+  const [backendStatus, setBackendStatus] = useState({ connected: false, checking: true });
+
+  // Check backend connectivity on mount
+  useEffect(() => {
+    async function checkBackend() {
+      try {
+        const health = await checkAAAHealth();
+        setBackendStatus({
+          connected: true,
+          checking: false,
+          status: health.status || 'HEALTHY',
+          mock: health._mock || false,
+        });
+      } catch (err) {
+        console.warn('[CallGuard] Backend not available, using mock mode:', err.message);
+        setBackendStatus({
+          connected: false,
+          checking: false,
+          error: err.message,
+        });
+      }
+    }
+    checkBackend();
+    // Re-check every 30 seconds
+    const interval = setInterval(checkBackend, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogin = (agent) => {
     setCurrentAgent(agent);
@@ -38,6 +66,11 @@ export default function App() {
         <span>⚠️ SIMULATED CALL — DEMO DATA ONLY</span>
         <span className="banner-pill">SYNTHETIC BIOMETRICS & PROMPTS</span>
         <span className="banner-pill">TENANT: callcentre_demo</span>
+        <span className={`banner-pill ${backendStatus.connected ? 'banner-pill-live' : 'banner-pill-mock'}`}>
+          {backendStatus.checking ? '⏳ CONNECTING...' :
+           backendStatus.connected ? (backendStatus.mock ? '🔗 MOCK API' : '🟢 LIVE BACKEND') :
+           '🔴 OFFLINE MODE'}
+        </span>
       </div>
 
       {/* Main Header */}

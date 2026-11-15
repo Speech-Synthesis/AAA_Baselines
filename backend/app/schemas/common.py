@@ -60,6 +60,15 @@ class ModelChecks(BaseModel):
     speaker_verification: ModelStatus = ModelStatus.UNAVAILABLE
     deepfake_detection: ModelStatus = ModelStatus.UNAVAILABLE
     asr: ModelStatus = ModelStatus.UNAVAILABLE
+    vishing_risk: ModelStatus = ModelStatus.UNAVAILABLE
+
+
+class SecurityChecks(BaseModel):
+    """Security component checks."""
+
+    jwt_secret: CheckStatus = CheckStatus.ERROR
+    voiceprint_encryption: CheckStatus = CheckStatus.ERROR
+    rate_limiting: CheckStatus = CheckStatus.ERROR
 
 
 class ReadinessChecks(BaseModel):
@@ -67,6 +76,7 @@ class ReadinessChecks(BaseModel):
 
     database: CheckStatus = CheckStatus.ERROR
     models: ModelChecks = Field(default_factory=ModelChecks)
+    security: SecurityChecks = Field(default_factory=SecurityChecks)
     configuration: CheckStatus = CheckStatus.ERROR
 
 

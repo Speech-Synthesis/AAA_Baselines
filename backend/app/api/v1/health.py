@@ -1,5 +1,9 @@
 """
 AAA Engine Health and Readiness Endpoints
+
+Per SYSTEM.md §5:
+- /v1/health: Liveness probe (process alive)
+- /v1/ready: Readiness probe (all dependencies available)
 """
 
 from datetime import datetime
@@ -8,7 +12,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ...core.config import validate_production_config
+from ...core.config import get_settings, validate_production_config
 from ...db import get_db
 from ...schemas.common import (
     CheckStatus,
@@ -17,6 +21,7 @@ from ...schemas.common import (
     ModelStatus,
     ReadinessChecks,
     ReadinessResponse,
+    SecurityChecks,
 )
 
 router = APIRouter()
@@ -36,17 +41,19 @@ async def health_check():
 @router.get("/ready", response_model=ReadinessResponse)
 async def readiness_check(response: Response, db: Session = Depends(get_db)):
     """
-    Readiness check.
+    Readiness check per SYSTEM.md §5.
 
     Checks:
     - Database connectivity
     - Configuration validity
-    - Model availability (lazy check)
+    - Model availability (SV, AD, ASR, VR)
+    - Security components (JWT, encryption, rate limiting)
 
     Returns 503 if any required dependency is unavailable.
     """
     checks = ReadinessChecks()
     all_ready = True
+    settings = get_settings()
 
     # Check database
     try:
@@ -67,7 +74,7 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
     # Check models (lazy - just check if modules can be imported)
     model_checks = ModelChecks()
 
-    # Speaker Verification
+    # Speaker Verification (AAA-SV)
     try:
         from ...layer1_speaker import MODEL
 
@@ -80,7 +87,7 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
     except Exception:
         model_checks.speaker_verification = ModelStatus.ERROR
 
-    # Deepfake Detection
+    # Deepfake Detection (AAA-AD)
     try:
         from ...layer2_deepfake import _MODEL
 
@@ -93,7 +100,7 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
     except Exception:
         model_checks.deepfake_detection = ModelStatus.ERROR
 
-    # ASR
+    # ASR (AAA-ASR)
     try:
         from ...layer3_asr import _whisper_model
 
@@ -106,7 +113,62 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
     except Exception:
         model_checks.asr = ModelStatus.ERROR
 
+    # Vishing Risk (AAA-VR)
+    try:
+        from ...adapters.vr import TranscriptRiskAdapter
+
+        vr_adapter = TranscriptRiskAdapter()
+        if vr_adapter is not None:
+            model_checks.vishing_risk = ModelStatus.OK
+        else:
+            model_checks.vishing_risk = ModelStatus.UNAVAILABLE
+    except ImportError:
+        model_checks.vishing_risk = ModelStatus.UNAVAILABLE
+    except Exception:
+        model_checks.vishing_risk = ModelStatus.ERROR
+
     checks.models = model_checks
+
+    # Check security components
+    security_checks = SecurityChecks()
+
+    # JWT Secret validation
+    try:
+        from ...security.jwt_auth import validate_jwt_secret
+
+        if validate_jwt_secret(settings.AAA_JWT_SECRET):
+            security_checks.jwt_secret = CheckStatus.OK
+        else:
+            security_checks.jwt_secret = CheckStatus.ERROR
+            all_ready = False
+    except Exception:
+        security_checks.jwt_secret = CheckStatus.ERROR
+        all_ready = False
+
+    # Voiceprint encryption
+    try:
+        from ...security.voiceprint_crypto import VoiceprintEncryptor
+
+        encryptor = VoiceprintEncryptor()
+        if encryptor is not None:
+            security_checks.voiceprint_encryption = CheckStatus.OK
+        else:
+            security_checks.voiceprint_encryption = CheckStatus.ERROR
+    except Exception:
+        security_checks.voiceprint_encryption = CheckStatus.ERROR
+
+    # Rate limiting
+    try:
+        from ...core.ratelimit import limiter
+
+        if limiter is not None:
+            security_checks.rate_limiting = CheckStatus.OK
+        else:
+            security_checks.rate_limiting = CheckStatus.ERROR
+    except Exception:
+        security_checks.rate_limiting = CheckStatus.ERROR
+
+    checks.security = security_checks
 
     # Set response status
     status = "ready" if all_ready else "not_ready"
