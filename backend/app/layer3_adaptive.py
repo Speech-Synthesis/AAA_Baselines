@@ -640,12 +640,13 @@ def verify_token(token: str, db: Session = None) -> bool:
 
     # Atomic update: Mark as used only if not already used and not expired
     # This prevents race conditions where two requests try to use the same token
+    # Use proper boolean syntax compatible with both SQLite and PostgreSQL
     result = db.execute(
         text("""
             UPDATE challenges
-            SET used = 1
+            SET used = true
             WHERE token = :token
-              AND used = 0
+              AND used = false
               AND expires_at > :now
         """),
         {"token": token, "now": now},
@@ -665,7 +666,7 @@ def verify_token(token: str, db: Session = None) -> bool:
         if not hmac.compare_digest(challenge.signature or "", expected_sig):
             # Signature mismatch - revert the used flag and return False
             db.execute(
-                text("UPDATE challenges SET used = 0 WHERE token = :token"), {"token": token}
+                text("UPDATE challenges SET used = false WHERE token = :token"), {"token": token}
             )
             db.commit()
             return False
@@ -695,12 +696,13 @@ def validate_and_consume_token(token: str, db: Session) -> dict | None:
     now = datetime.utcnow()
 
     # Atomic update: Mark as used only if not already used and not expired
+    # Use proper boolean syntax for PostgreSQL compatibility
     result = db.execute(
         text("""
             UPDATE challenges
-            SET used = 1
+            SET used = true
             WHERE token = :token
-              AND used = 0
+              AND used = false
               AND expires_at > :now
         """),
         {"token": token, "now": now},
@@ -724,7 +726,7 @@ def validate_and_consume_token(token: str, db: Session) -> dict | None:
         if not hmac.compare_digest(challenge.signature or "", expected_sig):
             # Signature mismatch - revert the used flag and return None
             db.execute(
-                text("UPDATE challenges SET used = 0 WHERE token = :token"), {"token": token}
+                text("UPDATE challenges SET used = false WHERE token = :token"), {"token": token}
             )
             db.commit()
             return None
