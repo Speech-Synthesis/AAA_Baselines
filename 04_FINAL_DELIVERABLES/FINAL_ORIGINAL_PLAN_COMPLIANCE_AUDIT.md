@@ -357,7 +357,7 @@ All 4 critical gaps identified in the original audit have been closed:
 
 | Gap | Status | Evidence |
 |-----|--------|----------|
-| AAA-controlled capture | **CLOSED** | capture.py, capture/index.html |
+| AAA-controlled capture | **CLOSED** | capture.py, capture/index.html, Verification.jsx, Enrollment.jsx |
 | Hard negative detection | **CLOSED** | vr.py, test_vr_hard_negatives.py |
 | Voiceprint revocation | **CLOSED** | voiceprints.py |
 | Verification status polling | **CLOSED** | verification_requests.py |
