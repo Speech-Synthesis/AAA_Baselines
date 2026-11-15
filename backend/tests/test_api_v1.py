@@ -150,25 +150,29 @@ class TestChallengesEndpoint:
         )
         assert response.status_code == 201
 
-    def test_create_challenge_user_not_found(self, client, test_db):
-        """Should return 404 for non-existent user."""
+    def test_create_challenge_user_not_found_demo_fallback(self, client, test_db):
+        """Demo mode: Should create challenge with fallback user when user not found."""
         response = client.post(
             "/v1/challenges",
             json={"user_id": str(uuid.uuid4())},
         )
-        assert response.status_code == 404
+        # In demo mode, creates a fallback user and returns challenge
+        assert response.status_code == 201
         data = response.json()
-        assert data["detail"]["code"] == "USER_NOT_FOUND"
+        assert "phrase" in data
+        assert "token" in data
 
-    def test_create_challenge_no_voiceprint(self, client, test_db, test_user):
-        """Should return 400 for user without voiceprint."""
+    def test_create_challenge_no_voiceprint_demo_allowed(self, client, test_db, test_user):
+        """Demo mode: Should allow challenge generation without voiceprint (enrollment in progress)."""
         response = client.post(
             "/v1/challenges",
             json={"user_id": str(test_user.id)},
         )
-        assert response.status_code == 400
+        # In demo mode, allows challenge generation even without voiceprint
+        assert response.status_code == 201
         data = response.json()
-        assert data["detail"]["code"] == "NO_VOICEPRINT"
+        assert "phrase" in data
+        assert "token" in data
 
     def test_create_challenge_with_request_id(self, client, test_db, test_user, test_voiceprint):
         """Should echo back X-Request-ID header."""
