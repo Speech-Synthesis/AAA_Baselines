@@ -395,7 +395,7 @@ async def verify(
     # Read audio
     audio_bytes = await audio.read()
 
-    expected_phrase = get_token_phrase(token) or ""
+    expected_phrase = get_token_phrase(token, db) or ""
     loop = asyncio.get_running_loop()
 
     # === GATES 1 & 2: Parallel execution of AD (Deepfake) and ASR (Phrase Match) ===
