@@ -956,9 +956,9 @@ class TestNumberVariants:
         ("15", "fifteen"),
     ])
     def test_two_digit_number_variants(self, expected, transcript):
-        result = verify_phrase(expected=expected, transcript=transcript)
         # Note: Some multi-digit numbers may not be supported
-        # This tests current behavior
+        # This tests current behavior - verifying no crash occurs
+        verify_phrase(expected=expected, transcript=transcript)
 
     def test_zero_variants(self):
         """Zero can be 'zero', 'oh', or '0'."""
@@ -1082,9 +1082,9 @@ class TestAdversarialModifications:
             ("its", "it's"),
         ]
         for expected, transcript in pairs:
-            result = verify_phrase(expected=expected, transcript=transcript)
             # Some may match due to normalization, but exact homophones rejected
-            # Document actual behavior
+            # This verifies no crash occurs
+            verify_phrase(expected=expected, transcript=transcript)
 
 
 # ---------------------------------------------------------------------------
@@ -1188,8 +1188,8 @@ class TestAdditionalEdgeCases:
 
     def test_ampersand_handling(self):
         """Ampersand should be normalized."""
-        result = verify_phrase(expected="bread & butter", transcript="bread and butter")
-        # Behavior depends on normalization rules
+        # Behavior depends on normalization rules - verify no crash
+        verify_phrase(expected="bread & butter", transcript="bread and butter")
 
     def test_at_symbol_removal(self):
         """At symbol should be removed."""
@@ -1203,13 +1203,13 @@ class TestAdditionalEdgeCases:
 
     def test_dollar_removal(self):
         """Dollar sign should be removed."""
-        result = verify_phrase(expected="$100", transcript="one hundred")
-        # Dollar sign with number - behavior depends on rules
+        # Dollar sign with number - behavior depends on rules, verify no crash
+        verify_phrase(expected="$100", transcript="one hundred")
 
     def test_percent_removal(self):
         """Percent sign should be removed."""
-        result = verify_phrase(expected="100%", transcript="one hundred")
-        # Percent with number - behavior depends on rules
+        # Percent with number - behavior depends on rules, verify no crash
+        verify_phrase(expected="100%", transcript="one hundred")
 
 
 if __name__ == "__main__":

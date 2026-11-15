@@ -12,7 +12,7 @@ import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -78,7 +78,7 @@ async def revoke_voiceprint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "INVALID_ID", "message": "Invalid voiceprint ID format"},
-        )
+        ) from None
 
     voiceprint = db.query(Voiceprint).filter(Voiceprint.id == vp_uuid).first()
 
@@ -160,7 +160,7 @@ async def get_voiceprint_status(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "INVALID_ID", "message": "Invalid voiceprint ID format"},
-        )
+        ) from None
 
     voiceprint = db.query(Voiceprint).filter(Voiceprint.id == vp_uuid).first()
 

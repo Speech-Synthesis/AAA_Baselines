@@ -11,7 +11,6 @@ The AAA-controlled capture component uses these grants to:
 import hashlib
 import hmac
 import secrets
-import uuid
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status

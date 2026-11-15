@@ -14,10 +14,8 @@ These tests run actual queries to verify policies work correctly.
 
 import uuid
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import text
 
 from app.models import AuthLog, Challenge, User, Voiceprint
 
@@ -296,8 +294,7 @@ class TestAnonymousAccessDenied:
         """Anonymous requests should not list users."""
         # Without authentication, user listing should be restricted
         # This tests the API endpoint behavior
-        response = client.get("/users")
-
+        client.get("/users")
         # In a properly secured system, this would return 401 or restricted data
         # Current implementation may allow this for demo purposes
         # The test documents expected behavior
@@ -350,7 +347,7 @@ class TestRLSPolicyEffectiveness:
 
         for frontend_dir in frontend_dirs:
             if os.path.exists(frontend_dir):
-                for root, dirs, files in os.walk(frontend_dir):
+                for root, _dirs, files in os.walk(frontend_dir):
                     for file in files:
                         if file.endswith((".js", ".jsx", ".ts", ".tsx")):
                             filepath = os.path.join(root, file)
@@ -392,6 +389,7 @@ def db_session():
 def client():
     """Create a test client."""
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     return TestClient(app)

@@ -9,7 +9,6 @@ Per SYSTEM.md §4:
 """
 
 import logging
-import uuid
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +16,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...db import get_db
-from ...models import AuthLog
 from ...schemas.common import Decision, RiskLevel
 from ...security.jwt_auth import get_current_tenant
 

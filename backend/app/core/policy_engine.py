@@ -30,7 +30,7 @@ logger = logging.getLogger("aaa_engine.policy")
 
 class GateResult(StrEnum):
     """Individual gate verification results."""
-    PASS = "PASS"
+    PASS = "PASS"  # noqa: S105 - not a password, it's a gate result
     FAIL = "FAIL"
     BORDERLINE = "BORDERLINE"
     UNAVAILABLE = "UNAVAILABLE"
