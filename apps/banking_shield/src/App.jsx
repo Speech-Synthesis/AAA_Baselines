@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Transactions from './pages/Transactions.jsx'
 import Enrollment from './pages/Enrollment.jsx'
 import Verification from './pages/Verification.jsx'
+import { checkAAAHealth } from './services/api.js'
 
 /**
  * Banking Shield - AAA Voice Authentication Demo
@@ -25,6 +26,32 @@ import Verification from './pages/Verification.jsx'
 function App() {
   const [user, setUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [backendStatus, setBackendStatus] = useState({ connected: false, checking: true })
+
+  // Check backend connectivity on mount
+  useEffect(() => {
+    async function checkBackend() {
+      try {
+        const health = await checkAAAHealth()
+        setBackendStatus({
+          connected: true,
+          checking: false,
+          status: health.status || 'HEALTHY',
+          mock: health._mock || false,
+        })
+      } catch (err) {
+        console.warn('[Banking Shield] Backend not available:', err.message)
+        setBackendStatus({
+          connected: false,
+          checking: false,
+          error: err.message,
+        })
+      }
+    }
+    checkBackend()
+    const interval = setInterval(checkBackend, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleLogin = (userData) => {
     setUser(userData)
@@ -39,6 +66,27 @@ function App() {
   return (
     <BrowserRouter>
       <div className="app-container">
+        {/* Backend Status Bar */}
+        <div className="backend-status-bar" style={{
+          background: backendStatus.connected
+            ? (backendStatus.mock ? '#f59e0b' : '#10b981')
+            : '#ef4444',
+          color: 'white',
+          padding: '4px 12px',
+          fontSize: '12px',
+          textAlign: 'center',
+          fontWeight: '500'
+        }}>
+          {backendStatus.checking ? '⏳ Connecting to AAA Engine...' :
+           backendStatus.connected ? (
+             backendStatus.mock
+               ? '🔗 MOCK API MODE — Demo Only'
+               : '🟢 LIVE BACKEND — Connected to AAA Engine'
+           ) : '🔴 OFFLINE — AAA Backend Unavailable'}
+          <span style={{ marginLeft: '12px', opacity: 0.8 }}>
+            Tenant: bank_demo
+          </span>
+        </div>
         <Routes>
           <Route
             path="/login"
