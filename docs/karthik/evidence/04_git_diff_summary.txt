@@ -1,0 +1,22 @@
+======================================================================
+GIT DIFF STAT SUMMARY FOR SECURITY & BANKING DELIVERABLES
+Branch: feat/karthik-security-banking vs main
+======================================================================
+
+ backend/app/security/__init__.py            |  32 +++++
+ backend/app/security/jwt_auth.py            | 375 +++++++++++++++++++++++++++++
+ backend/app/security/challenge_lifecycle.py | 148 ++++++++++++
+ backend/app/security/voiceprint_crypto.py   | 131 ++++++++++
+ backend/app/security/host_auth.py           | 110 +++++++++
+ backend/app/schemas/risk.py                 |  72 ++++++
+ backend/app/adapters/vr.py                  | 130 ++++++++++
+ backend/app/api/v1/risk.py                  |  43 ++++
+ backend/app/core/logging.py                 |  75 ++++++
+ backend/tests/test_jwt_auth.py              | 162 +++++++++++++
+ backend/tests/test_challenge_lifecycle.py   |  93 +++++++
+ backend/tests/test_risk_transcript.py       |  71 ++++++
+ backend/tests/test_voiceprint_crypto.py     |  61 +++++
+ backend/tests/test_host_auth.py             |  62 +++++
+ backend/requirements.txt                    |   2 +
+ pyproject.toml                              |  47 ++++
+ 16 files changed, 1614 insertions(+)

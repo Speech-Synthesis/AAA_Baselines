@@ -1,0 +1,62 @@
+======================================================================
+AAA ENGINE SECURITY SUITE TEST EXECUTION LOG
+Branch: feat/karthik-security-banking
+Commit: 754c4f9cb9086161476f57134375b481c03bf47b
+======================================================================
+
+test_capture_grant_lifecycle (test_challenge_lifecycle.TestChallengeLifecycle) ... ok
+test_generate_and_consume_token_success (test_challenge_lifecycle.TestChallengeLifecycle) ... ok
+test_replay_attack_prevention (test_challenge_lifecycle.TestChallengeLifecycle) ... ok
+test_state_machine_transitions (test_challenge_lifecycle.TestChallengeLifecycle) ... ok
+test_tampered_signature_rejection (test_challenge_lifecycle.TestChallengeLifecycle) ... ok
+test_evaluate_banking_decision_approve (test_host_auth.TestHostAuthBanking) ... ok
+test_evaluate_banking_decision_marginal_step_up (test_host_auth.TestHostAuthBanking) ... ok
+test_evaluate_banking_decision_spoof_denied (test_host_auth.TestHostAuthBanking) ... ok
+test_validate_host_token_valid (test_host_auth.TestHostAuthBanking) ... ok
+test_cors_strict_allow (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_cors_wildcard_ban (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_get_current_tenant_dependency (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_lockout_policy_generic_error (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_rate_limiting_generic_error (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_token_exchange_invalid_credentials (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_token_exchange_success (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_validate_jwt_secret_fatal_crash_on_weak (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_validate_jwt_secret_valid (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_verify_client_credentials (test_jwt_auth.TestSecurityJWTAuth) ... ok
+test_benign_transcript_low_risk (test_risk_transcript.TestAAAVRRiskAnalysis) ... ok
+test_credential_harvesting_critical (test_risk_transcript.TestAAAVRRiskAnalysis) ... ok
+test_direct_endpoint_handler (test_risk_transcript.TestAAAVRRiskAnalysis) ... ok
+test_vishing_urgent_wire_high_risk (test_risk_transcript.TestAAAVRRiskAnalysis) ... ok
+test_encrypt_decrypt_exact_match (test_voiceprint_crypto.TestVoiceprintCrypto) ... ok
+test_packed_format (test_voiceprint_crypto.TestVoiceprintCrypto) ... ok
+test_tamper_detection (test_voiceprint_crypto.TestVoiceprintCrypto) ... ok
+test_tenant_key_derivation (test_voiceprint_crypto.TestVoiceprintCrypto) ... ok
+test_wrong_key_fails_authentication (test_voiceprint_crypto.TestVoiceprintCrypto) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.028s
+
+OK
+======================================================================
+DATABASE & CORE PERSISTENCE TESTS (SQLite & PostgreSQL)
+======================================================================
+TestChallengeGeneration.test_challenge_expires_in_90_seconds: PASS
+TestChallengeGeneration.test_challenge_has_unique_phrase: PASS
+TestChallengeGeneration.test_generate_challenge_with_db: PASS
+TestChallengeGeneration.test_generate_challenge_without_db: PASS
+TestTokenCleanup.test_cleanup_preserves_valid: PASS
+TestTokenCleanup.test_cleanup_removes_expired: PASS
+TestTokenHelperFunctions.test_get_token_phrase: PASS
+TestTokenHelperFunctions.test_get_token_user_id: PASS
+TestTokenHelperFunctions.test_returns_none_for_invalid: PASS
+TestTokenHelperFunctions.test_returns_none_without_db: PASS
+TestTokenVerification.test_expired_token_rejected: PASS
+TestTokenVerification.test_invalid_token_rejected: PASS
+TestTokenVerification.test_token_single_use: PASS
+TestTokenVerification.test_valid_token_accepted: PASS
+TestValidateAndConsumeToken.test_returns_challenge_data: PASS
+TestValidateAndConsumeToken.test_returns_none_for_invalid: PASS
+TestValidateAndConsumeToken.test_returns_none_for_replay: PASS
+TestSecretConfiguration.test_missing_secret_raises_in_production: PASS
+
+OVERALL RESULT: ALL TESTS PASSED (100% SUCCESS RATE)

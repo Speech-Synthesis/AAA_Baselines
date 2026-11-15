@@ -8,28 +8,31 @@ Updated by Surya (Nov 11, 2026):
 - Legacy routes preserved for backward compatibility
 """
 
+import asyncio
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from slowapi.errors import RateLimitExceeded
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-# Import v1 API router
+# Import v1 API router and security routers
 from .api.v1 import router as v1_router
 from .core.config import get_settings
-from .core.ratelimit import limiter, rate_limit_exceeded_handler
+from .core.ratelimit import RateLimitExceeded, limiter, rate_limit_exceeded_handler
 from .db import Base, engine, get_db
 from .layer1_speaker import enroll_speaker, verify_speaker
 from .layer2_deepfake import detect_spoof
 from .layer3_adaptive import generate_challenge, get_token_phrase, update_voiceprint, verify_token
 from .layer3_asr import verify_phrase
 from .models import AuthLog, Challenge, User, Voiceprint
+from .schemas.common import Decision
+from .security.host_auth import BankingShieldPolicy, evaluate_banking_decision
+from .security.jwt_auth import configure_cors
+from .security.jwt_auth import router as jwt_auth_router
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -46,31 +49,12 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# Include v1 API router
+# Include security & v1 API routers
+app.include_router(jwt_auth_router)
 app.include_router(v1_router)
 
-# CORS for frontend - using settings for origins
-# Note: Wildcard patterns preserved for backward compatibility
-# TODO: Restrict to specific origins in production
-cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else []
-cors_origins.extend(
-    [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:3000",
-        "https://aaa-frontend.onrender.com",
-        "https://*.onrender.com",
-        "https://*.hf.space",
-    ]
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Configure strict, hardened CORS (prohibits wildcards, allows authorized origins)
+configure_cors(app)
 
 # Serve static frontend files (for production deployment)
 STATIC_DIR = Path(__file__).parent.parent / "static"
@@ -107,14 +91,18 @@ class ChallengeResponse(BaseModel):
 
 
 class VerifyResponse(BaseModel):
-    result: str  # "ACCEPT" | "REJECT"
-    confidence: float
-    layer_blocked: int | None
-    session_id: str
-    reason: str
-    l2_label: str
-    l2_confidence: float
-    l1_score: float
+    decision: Decision = Decision.DENY
+    result: str = "REJECT"  # "ACCEPT" | "REJECT" for backward compatibility
+    reason: str = ""
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    verification_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    completed_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    confidence: float = 0.0
+    layer_blocked: int | None = None
+    l2_label: str | None = None
+    l2_confidence: float | None = None
+    l1_score: float | None = None
     asr_transcript: str | None = None
     asr_similarity: float | None = None
 
@@ -259,6 +247,7 @@ async def get_challenge(request: Request, user_id: str = Query(...), db: Session
 
 
 @app.post("/auth/verify", response_model=VerifyResponse)
+@app.post("/v1/verify", response_model=VerifyResponse)
 @limiter.limit(settings.RATE_LIMIT_VERIFY)
 async def verify(
     request: Request,
@@ -269,7 +258,8 @@ async def verify(
 ):
     """
     Verify user's voice against challenge.
-    Pipeline: L2 (deepfake) → L1 (speaker) → L3 (token + EMA update)
+    Approved 5-Gate Architecture:
+    Gate 1 (AD Deepfake) || Gate 2 (ASR Phrase) concurrently -> Gate 3 (SV Speaker) -> PolicyEngine -> EMA Update
     """
     session_id = str(uuid.uuid4())
 
@@ -286,13 +276,24 @@ async def verify(
     # Read audio
     audio_bytes = await audio.read()
 
-    # === LAYER 2: Deepfake Detection ===
-    l2_result = detect_spoof(audio_bytes)
-    l2_label = l2_result["label"]
-    l2_confidence = l2_result["confidence"]
+    expected_phrase = get_token_phrase(token) or ""
+    loop = asyncio.get_running_loop()
 
-    if l2_label == "spoof" and l2_confidence > L2_SPOOF_THRESHOLD:
-        # Log and reject
+    # === GATES 1 & 2: Parallel execution of AD (Deepfake) and ASR (Phrase Match) ===
+    l2_task = loop.run_in_executor(None, detect_spoof, audio_bytes)
+    asr_task = loop.run_in_executor(
+        None, verify_phrase, audio_bytes, expected_phrase, ASR_PHRASE_THRESHOLD
+    )
+    l2_result, (asr_match, asr_similarity, asr_transcript) = await asyncio.gather(
+        l2_task, asr_task
+    )
+
+    l2_label = l2_result.get("label", "unknown")
+    l2_confidence = float(l2_result.get("confidence", 0.0))
+    is_spoof = l2_label == "spoof" and l2_confidence > L2_SPOOF_THRESHOLD
+
+    # Gate 1 check: Fail-closed on spoof
+    if is_spoof:
         log = AuthLog(
             user_id=uuid.UUID(user_id),
             l2_label=l2_label,
@@ -305,6 +306,7 @@ async def verify(
         db.commit()
 
         return VerifyResponse(
+            decision=Decision.DENY,
             result="REJECT",
             confidence=l2_confidence,
             layer_blocked=2,
@@ -313,16 +315,12 @@ async def verify(
             l2_label=l2_label,
             l2_confidence=l2_confidence,
             l1_score=0.0,
+            asr_transcript=asr_transcript,
+            asr_similarity=asr_similarity,
         )
 
-    # === LAYER 3A: ASR Phrase Verification (before speaker check) ===
-    expected_phrase = get_token_phrase(token)
-    asr_match, asr_similarity, asr_transcript = verify_phrase(
-        audio_bytes, expected_phrase or "", ASR_PHRASE_THRESHOLD
-    )
-
+    # Gate 2 check: Fail-closed on challenge phrase mismatch
     if not asr_match:
-        # Log and reject - wrong phrase spoken
         log = AuthLog(
             user_id=uuid.UUID(user_id),
             l2_label=l2_label,
@@ -335,6 +333,7 @@ async def verify(
         db.commit()
 
         return VerifyResponse(
+            decision=Decision.DENY,
             result="REJECT",
             confidence=asr_similarity,
             layer_blocked=4,
@@ -347,13 +346,21 @@ async def verify(
             asr_similarity=asr_similarity,
         )
 
-    # === LAYER 1: Speaker Verification ===
-    l1_result = verify_speaker(audio_bytes, voiceprint.embedding)
-    l1_score = l1_result["score"]
-    new_embedding = l1_result["embedding"]
+    # === GATE 3: Speaker Verification (runs only after Gates 1 & 2 pass) ===
+    l1_task = loop.run_in_executor(None, verify_speaker, audio_bytes, voiceprint.embedding)
+    l1_result = await l1_task
+    l1_score = float(l1_result.get("score", 0.0))
+    new_embedding = l1_result.get("embedding", [])
 
-    if l1_score < L1_SIMILARITY_THRESHOLD:
-        # Log and reject
+    # === POLICY ENGINE: Banking Shield / Multi-Tiered Policy Evaluation ===
+    policy_decision, requires_step_up = evaluate_banking_decision(
+        similarity_score=l1_score,
+        is_spoof=is_spoof,
+        policy_tier=BankingShieldPolicy.STANDARD,
+        spoof_confidence=l2_confidence,
+    )
+
+    if policy_decision == Decision.DENY:
         log = AuthLog(
             user_id=uuid.UUID(user_id),
             l2_label=l2_label,
@@ -366,6 +373,7 @@ async def verify(
         db.commit()
 
         return VerifyResponse(
+            decision=Decision.DENY,
             result="REJECT",
             confidence=l1_score,
             layer_blocked=1,
@@ -378,9 +386,34 @@ async def verify(
             asr_similarity=asr_similarity,
         )
 
-    # === LAYER 3B: Token Verification ===
+    if policy_decision == Decision.STEP_UP:
+        log = AuthLog(
+            user_id=uuid.UUID(user_id),
+            l2_label=l2_label,
+            l2_confidence=l2_confidence,
+            l1_score=l1_score,
+            result="REJECT",
+            layer_blocked=1,
+        )
+        db.add(log)
+        db.commit()
+
+        return VerifyResponse(
+            decision=Decision.STEP_UP,
+            result="REJECT",
+            confidence=l1_score,
+            layer_blocked=1,
+            session_id=session_id,
+            reason="Marginal speaker match, secondary authentication factor required",
+            l2_label=l2_label,
+            l2_confidence=l2_confidence,
+            l1_score=l1_score,
+            asr_transcript=asr_transcript,
+            asr_similarity=asr_similarity,
+        )
+
+    # === GATE 4: Token Verification ===
     if not verify_token(token):
-        # Log and reject
         log = AuthLog(
             user_id=uuid.UUID(user_id),
             l2_label=l2_label,
@@ -393,6 +426,7 @@ async def verify(
         db.commit()
 
         return VerifyResponse(
+            decision=Decision.DENY,
             result="REJECT",
             confidence=0.0,
             layer_blocked=3,
@@ -408,7 +442,7 @@ async def verify(
     if challenge:
         challenge.used = True
 
-    # === SUCCESS: Update voiceprint with EMA ===
+    # === GATE 5: Update voiceprint with EMA on APPROVE ===
     updated_embedding = update_voiceprint(voiceprint.embedding, new_embedding)
     voiceprint.embedding = updated_embedding
     voiceprint.sample_count += 1
@@ -428,6 +462,7 @@ async def verify(
     db.commit()
 
     return VerifyResponse(
+        decision=Decision.APPROVE,
         result="ACCEPT",
         confidence=l1_score,
         layer_blocked=None,

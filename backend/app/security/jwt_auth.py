@@ -349,6 +349,15 @@ def configure_cors(app: Any) -> None:
     parsed_origins: list[str] = []
     if raw_origins and raw_origins.strip():
         parsed_origins = [orig.strip() for orig in raw_origins.split(",") if orig.strip()]
+    elif raw_origins is not None and not raw_origins.strip() and "ALLOWED_ORIGINS" in os.environ:
+        parsed_origins = []
+    else:
+        # Secure local default origins for CallGuard (5174), Banking Shield (5173), and frontend (3000)
+        parsed_origins = [
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:3000",
+        ]
 
     wildcard_detected = any("*" in origin for origin in parsed_origins)
     if wildcard_detected:
@@ -366,5 +375,5 @@ def configure_cors(app: Any) -> None:
         allow_origins=allowed_origins,
         allow_credentials=True if allowed_origins else False,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Capture-Grant"],
     )

@@ -1,0 +1,18 @@
+======================================================================
+GIT COMMIT LOG EVIDENCE
+Branch: feat/karthik-security-banking
+Author: KarthikMallareddy <mrkarthik1811@gmail.com>
+======================================================================
+
+754c4f9 - KarthikMallareddy <mrkarthik1811@gmail.com> (Sat Nov 14 12:20:10 2026 +0530): fix(ci): handle test-mode fallback for AAA_JWT_SECRET and configure CI environment
+80a5e13 - KarthikMallareddy <mrkarthik1811@gmail.com> (Sat Nov 14 12:06:23 2026 +0530): fix(tests): restore missing secret import test and remove duplicate fixtures
+012203e - KarthikMallareddy <mrkarthik1811@gmail.com> (Sat Nov 14 01:08:42 2026 +0530): fix(ci): resolve ruff lint violations and add python-jose dependency
+f982be7 - KarthikMallareddy <mrkarthik1811@gmail.com> (Sat Nov 14 00:03:53 2026 +0530): docs(security): add formal resolution and sign-off report for Surya Day 3 dependencies
+a6eaf3a - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 21:26:02 2026 +0530): fix(host-auth): add Tuple import in host_auth module
+7828415 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:23 2026 +0530): docs(security): document Voiceprint AES-256-GCM and Banking Shield security contracts
+e67ce72 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:22 2026 +0530): test(security): add test suite for host authentication and Banking Shield gateway
+bc44098 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:22 2026 +0530): feat(logging): implement StructuredSecurityFormatter for compliant audit logging
+81ca448 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:22 2026 +0530): feat(security): implement HostAppAuthenticator with audience and scope verification
+29896b4 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:21 2026 +0530): test(crypto): add comprehensive unit test suite for AES-256-GCM voiceprint encryption
+d092b07 - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:21 2026 +0530): feat(crypto): implement per-tenant cryptographic key derivation using HMAC-SHA256
+2b89b8f - KarthikMallareddy <mrkarthik1811@gmail.com> (Fri Nov 13 18:42:21 2026 +0530): feat(crypto): add packed format serialization for single-field database storage

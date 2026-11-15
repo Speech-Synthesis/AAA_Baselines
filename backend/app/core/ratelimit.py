@@ -5,9 +5,29 @@ Configurable rate limiting for API endpoints.
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+
+try:
+    from slowapi import Limiter
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.util import get_remote_address
+except ImportError:
+
+    class RateLimitExceeded(Exception):
+        detail = "Rate limit exceeded"
+        retry_after = 60
+
+    class Limiter:
+        def __init__(self, key_func=None):
+            pass
+
+        def limit(self, *args, **kwargs):
+            def decorator(fn):
+                return fn
+
+            return decorator
+
+    def get_remote_address(request: Request) -> str:
+        return "127.0.0.1"
 
 from .config import get_settings
 

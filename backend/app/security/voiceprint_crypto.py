@@ -7,11 +7,13 @@ Role: Security & Perimeter Defense Engineer
 """
 
 import hashlib
-import hmac
 import json
 import os
+from typing import List, Optional, Tuple
 
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 NONCE_SIZE_BYTES = 12  # Standard 96-bit nonce for AES-GCM
 KEY_SIZE_BYTES = 32  # 256-bit AES key
@@ -119,7 +121,7 @@ class VoiceprintEncryptor:
 
 def derive_tenant_voiceprint_key(tenant_id: str, master_key: bytes | None = None) -> bytes:
     """
-    Derives an isolated 256-bit cryptographic key per tenant using HMAC-SHA256.
+    Derives an isolated 256-bit cryptographic key per tenant using HKDF-SHA256 (RFC 5869).
     Ensures cryptographic multi-tenant separation for biometric data at rest.
     """
     if not tenant_id:
@@ -128,4 +130,10 @@ def derive_tenant_voiceprint_key(tenant_id: str, master_key: bytes | None = None
     master = (
         master_key or os.environ.get("VOICEPRINT_KEY", "master-voiceprint-vault-key-2026!").encode()
     )
-    return hmac.new(master, f"tenant-isolation-key:{tenant_id}".encode(), hashlib.sha256).digest()
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=KEY_SIZE_BYTES,
+        salt=None,
+        info=f"tenant-isolation-key:{tenant_id}".encode("utf-8"),
+    )
+    return hkdf.derive(master)
