@@ -26,8 +26,16 @@ function App() {
   };
 
   useEffect(() => {
+    // Initial health check and user load
     checkServerHealth().then(setIsServerLive);
     loadUsers();
+
+    // Periodic health check every 30 seconds
+    const healthInterval = setInterval(() => {
+      checkServerHealth().then(setIsServerLive);
+    }, 30000);
+
+    return () => clearInterval(healthInterval);
   }, []);
 
   return (

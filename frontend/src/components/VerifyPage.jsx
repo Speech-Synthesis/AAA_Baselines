@@ -199,50 +199,67 @@ export function VerifyPage({ activeUser, onComplete }) {
           )}
 
           {verifyResult && (
-            <div className={`light-decision-card ${verifyResult.result}`}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+            <div className={`light-decision-card ${verifyResult.decision || verifyResult.result}`}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span className={`badge-decision-light ${verifyResult.result}`}>
-                    {verifyResult.result}
+                  <span className={`badge-decision-light ${verifyResult.decision || verifyResult.result}`}>
+                    {verifyResult.decision || verifyResult.result}
                   </span>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-                    {verifyResult.reason}
+                    {verifyResult.reason || verifyResult.reason_public}
                   </span>
                 </div>
 
-                {verifyResult.layer_blocked && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--danger-red)', fontWeight: 700 }}>
-                    Blocked at Layer {verifyResult.layer_blocked}
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {verifyResult.risk_level && (
+                    <span className={`badge-risk-light ${verifyResult.risk_level}`}>
+                      {verifyResult.risk_level}
+                    </span>
+                  )}
+                  {verifyResult.layer_blocked && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--danger-red)', fontWeight: 700 }}>
+                      Blocked at {verifyResult.layer_blocked}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {(verifyResult.requires_fresh_challenge || verifyResult.requires_human_review) && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'var(--warning-amber-light, #fef3c7)', borderRadius: 'var(--radius-md)', border: '1px solid var(--warning-amber)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)' }}>
+                    {verifyResult.requires_fresh_challenge && 'Fresh challenge required for STEP_UP authentication. '}
+                    {verifyResult.requires_human_review && 'Human review required before proceeding.'}
+                  </span>
+                </div>
+              )}
 
               <div className="saas-metrics-grid">
                 <div className="saas-stat-card">
-                  <div className="saas-stat-label">L2 Deepfake Label</div>
-                  <div className="saas-stat-val" style={{ color: verifyResult.l2_label === 'spoof' ? 'var(--danger-red)' : 'var(--success-green)' }}>
-                    {verifyResult.l2_label?.toUpperCase() || 'BONAFIDE'}
+                  <div className="saas-stat-label">Decision</div>
+                  <div className="saas-stat-val" style={{ color: (verifyResult.decision || verifyResult.result) === 'APPROVE' ? 'var(--success-green)' : 'var(--danger-red)' }}>
+                    {verifyResult.decision || verifyResult.result}
                   </div>
                 </div>
 
                 <div className="saas-stat-card">
-                  <div className="saas-stat-label">L2 Spoof Confidence</div>
-                  <div className="saas-stat-val">
-                    {(verifyResult.l2_confidence * 100).toFixed(1)}%
+                  <div className="saas-stat-label">Risk Level</div>
+                  <div className="saas-stat-val" style={{ color: verifyResult.risk_level === 'CRITICAL' ? 'var(--danger-red)' : verifyResult.risk_level === 'HIGH' ? 'var(--warning-amber)' : 'var(--success-green)' }}>
+                    {verifyResult.risk_level || 'LOW'}
                   </div>
                 </div>
 
                 <div className="saas-stat-card">
-                  <div className="saas-stat-label">L1 Speaker Similarity</div>
-                  <div className="saas-stat-val" style={{ color: 'var(--primary-blue)' }}>
-                    {(verifyResult.l1_score * 100).toFixed(1)}%
+                  <div className="saas-stat-label">Session ID</div>
+                  <div className="saas-stat-val" style={{ fontSize: '0.75rem', color: 'var(--primary-blue)' }}>
+                    {verifyResult.session_id?.substring(0, 12) || 'N/A'}...
                   </div>
                 </div>
 
                 <div className="saas-stat-card">
-                  <div className="saas-stat-label">L3 ASR Phrase Match</div>
-                  <div className="saas-stat-val" style={{ color: verifyResult.asr_similarity >= 0.6 ? 'var(--success-green)' : 'var(--danger-red)' }}>
-                    {verifyResult.asr_similarity != null ? `${(verifyResult.asr_similarity * 100).toFixed(1)}%` : 'N/A'}
+                  <div className="saas-stat-label">Request ID</div>
+                  <div className="saas-stat-val" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {verifyResult.request_id?.substring(0, 12) || 'N/A'}...
                   </div>
                 </div>
               </div>

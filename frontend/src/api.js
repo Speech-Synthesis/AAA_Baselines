@@ -12,15 +12,35 @@ const client = axios.create({
   timeout: 60000,
 });
 
-// Check if live backend is reachable
+// Backend availability status (updated by checkServerHealth)
+let BACKEND_AVAILABLE = true;
+
+// Check if live backend is reachable (uses /v1/health endpoint)
 export const checkServerHealth = async () => {
   try {
-    const res = await client.get('/');
-    return res.data && res.data.status === 'running';
+    const res = await client.get('/v1/health', { timeout: 5000 });
+    BACKEND_AVAILABLE = res.data && res.data.status === 'healthy';
+    return BACKEND_AVAILABLE;
   } catch (err) {
+    BACKEND_AVAILABLE = false;
+    console.warn('[AAA Frontend] Backend unavailable:', err.message);
     return false;
   }
 };
+
+// Get detailed readiness status (includes model status)
+export const checkServerReadiness = async () => {
+  try {
+    const res = await client.get('/v1/ready', { timeout: 10000 });
+    return res.data;
+  } catch (err) {
+    console.warn('[AAA Frontend] Readiness check failed:', err.message);
+    return { status: 'not_ready', error: err.message };
+  }
+};
+
+// Get current backend availability status
+export const isBackendAvailable = () => BACKEND_AVAILABLE;
 
 // Get all registered users
 export const getAllUsers = async () => {

@@ -560,3 +560,37 @@ body {
 }
 .badge-tag-light.ACCEPT { background: var(--success-light); color: var(--success-green); }
 .badge-tag-light.REJECT { background: var(--danger-light); color: var(--danger-red); }
+
+/* Five-Outcome Decision Badges (APPROVE, DENY, STEP_UP, REVIEW, UNAVAILABLE) */
+.light-decision-card.APPROVE { background: var(--success-light); border-color: var(--success-green); }
+.light-decision-card.DENY { background: var(--danger-light); border-color: var(--danger-red); }
+.light-decision-card.STEP_UP { background: #fef3c7; border-color: var(--warning-amber); }
+.light-decision-card.REVIEW { background: #f3e8ff; border-color: #8b5cf6; }
+.light-decision-card.UNAVAILABLE { background: #f1f5f9; border-color: #94a3b8; }
+
+.badge-decision-light.APPROVE { background: var(--success-green); color: #ffffff; }
+.badge-decision-light.DENY { background: var(--danger-red); color: #ffffff; }
+.badge-decision-light.STEP_UP { background: var(--warning-amber); color: #ffffff; }
+.badge-decision-light.REVIEW { background: #8b5cf6; color: #ffffff; }
+.badge-decision-light.UNAVAILABLE { background: #94a3b8; color: #ffffff; }
+
+.badge-tag-light.APPROVE { background: var(--success-light); color: var(--success-green); }
+.badge-tag-light.DENY { background: var(--danger-light); color: var(--danger-red); }
+.badge-tag-light.STEP_UP { background: #fef3c7; color: #92400e; }
+.badge-tag-light.REVIEW { background: #f3e8ff; color: #7c3aed; }
+.badge-tag-light.UNAVAILABLE { background: #f1f5f9; color: #475569; }
+
+/* Risk Level Badges */
+.badge-risk-light {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-risk-light.LOW { background: var(--success-light); color: var(--success-green); }
+.badge-risk-light.MEDIUM { background: #fef3c7; color: #92400e; }
+.badge-risk-light.HIGH { background: #fed7aa; color: #c2410c; }
+.badge-risk-light.CRITICAL { background: var(--danger-light); color: var(--danger-red); }
