@@ -31,9 +31,9 @@ if sys.platform == "win32":
     except (AttributeError, io.UnsupportedOperation, OSError):
         pass
 
-# Whisper model - use "base" for good balance of speed/accuracy
+# Whisper model - use "small" for better accuracy
 # Options: tiny, base, small, medium, large
-_MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
+_MODEL_SIZE = os.getenv("WHISPER_MODEL", "small")
 _whisper_model = None
 
 

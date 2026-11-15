@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { enrollVoice } from '../api';
+import React, { useState, useRef, useEffect } from 'react';
+import { enrollVoice, getVoiceprintHistory } from '../api';
 import { convertBlobTo16kHzWav } from '../utils/audioEncoder';
 
 export function EnrollPage({ activeUser, onComplete }) {
@@ -12,6 +12,19 @@ export function EnrollPage({ activeUser, onComplete }) {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+
+  // Fetch current sample count from database when user changes
+  useEffect(() => {
+    if (activeUser?.id) {
+      getVoiceprintHistory(activeUser.id).then((history) => {
+        if (history && history.length > 0) {
+          setSampleCount(history[0].sample_count || 0);
+        } else {
+          setSampleCount(0);
+        }
+      });
+    }
+  }, [activeUser?.id]);
 
   const startRecording = async () => {
     if (!activeUser) {

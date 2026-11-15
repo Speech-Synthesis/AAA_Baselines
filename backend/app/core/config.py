@@ -26,10 +26,10 @@ class Settings(BaseSettings):
     L3_HMAC_SECRET: str | None = None
 
     # Model Configuration
-    WHISPER_MODEL: str = "base"
+    WHISPER_MODEL: str = "small"  # "small" for better accuracy (was "base")
 
     # Thresholds (configurable via environment)
-    L2_SPOOF_THRESHOLD: float = 0.5
+    L2_SPOOF_THRESHOLD: float = 0.7  # Raised to reduce false positives (was 0.5)
     L1_SIMILARITY_THRESHOLD: float = 0.5
     ASR_PHRASE_THRESHOLD: float = 0.6
 
