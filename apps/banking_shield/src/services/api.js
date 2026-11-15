@@ -18,21 +18,40 @@
  * (APPROVE, DENY, STEP_UP, REVIEW, UNAVAILABLE) originate from backend PolicyEngine.
  */
 
-// Environment detection - production builds MUST set VITE_USE_MOCK_API=false
+// Environment detection
 const IS_PRODUCTION = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.PROD === true;
-const MOCK_EXPLICITLY_DISABLED = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_USE_MOCK_API === "false";
+const MOCK_EXPLICITLY_ENABLED = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_USE_MOCK_API === "true";
 
-// Mock mode: ONLY enabled in development when explicitly NOT disabled
-// Production builds should ALWAYS have mock disabled
-const USE_MOCK = IS_PRODUCTION ? false : !MOCK_EXPLICITLY_DISABLED;
+// DEFAULT TO LIVE MODE - only use mock if explicitly enabled or backend unavailable
+let USE_MOCK = MOCK_EXPLICITLY_ENABLED;
+let BACKEND_AVAILABLE = true;
 
 const API_BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_AAA_API_BASE_URL) || "http://localhost:8000";
 const DEMO_TENANT = "bank_demo";
 
-// Log mode on initialization (development only)
-if (!IS_PRODUCTION) {
-  console.info(`[Banking Shield API] Mode: ${USE_MOCK ? 'MOCK (dev only)' : 'LIVE'}, Backend: ${API_BASE}`);
+// Check backend availability on load
+async function checkBackendAvailability() {
+  try {
+    const res = await fetch(`${API_BASE}/v1/health`, { method: 'GET', signal: AbortSignal.timeout(3000) });
+    BACKEND_AVAILABLE = res.ok;
+    if (!BACKEND_AVAILABLE && !MOCK_EXPLICITLY_ENABLED) {
+      console.warn('[Banking Shield API] Backend unavailable, falling back to mock mode');
+      USE_MOCK = true;
+    }
+  } catch (err) {
+    BACKEND_AVAILABLE = false;
+    if (!MOCK_EXPLICITLY_ENABLED) {
+      console.warn('[Banking Shield API] Backend unreachable, falling back to mock mode:', err.message);
+      USE_MOCK = true;
+    }
+  }
 }
+
+// Initialize backend check
+checkBackendAvailability();
+
+// Log mode on initialization
+console.info(`[Banking Shield API] Mode: ${USE_MOCK ? 'MOCK (fallback)' : 'LIVE'}, Backend: ${API_BASE}`);
 
 /**
  * Create a challenge for voice authentication.
