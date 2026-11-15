@@ -3,6 +3,7 @@ Layer 3 — Speech-to-Text (ASR) for Challenge Phrase Verification
 Uses OpenAI Whisper to transcribe audio and verify spoken phrase matches expected challenge.
 Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase matcher.
 """
+from __future__ import annotations
 
 import difflib
 import io
@@ -14,12 +15,6 @@ import sys
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-from __future__ import annotations
-
-import difflib
-import io
-import os
-import sys
 
 import numpy as np
 import soundfile as sf
@@ -153,7 +148,6 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 def verify_phrase(
     audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6
 ) -> tuple[bool, float, str]:
-def verify_phrase(audio_bytes: bytes, expected_phrase: str, threshold: float = 0.6) -> tuple[bool, float, str]:
     """
     Verify that spoken audio matches expected challenge phrase.
     Updated for Day 1: Uses deterministic exact matching after safe normalization.
