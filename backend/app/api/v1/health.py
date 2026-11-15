@@ -134,9 +134,10 @@ async def readiness_check(response: Response, db: Session = Depends(get_db)):
 
     # JWT Secret validation
     try:
-        from ...security.jwt_auth import validate_jwt_secret
+        from ...security.jwt_auth import JWT_SECRET
 
-        if validate_jwt_secret(settings.AAA_JWT_SECRET):
+        # JWT_SECRET is validated at module load time
+        if JWT_SECRET and len(JWT_SECRET) >= 32:
             security_checks.jwt_secret = CheckStatus.OK
         else:
             security_checks.jwt_secret = CheckStatus.ERROR
