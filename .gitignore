@@ -55,3 +55,7 @@ test_*.db
 
 # Personal reports (not to be committed)
 /local_reports/surya/
+
+# Final PDF Report reference (do not commit to git)
+AAA_Engine_Final_Report.pdf
+
