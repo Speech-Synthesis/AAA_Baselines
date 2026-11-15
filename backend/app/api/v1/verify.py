@@ -50,6 +50,7 @@ from ...models import AuthLog, User, Voiceprint
 from ...schemas.common import Decision, RiskLevel
 from ...security.jwt_auth import oauth2_scheme
 from ...services.voiceprint_service import decrypt_embedding, encrypt_embedding
+from .verification_requests import register_verification_request
 
 router = APIRouter(prefix="/verify", tags=["authentication"])
 logger = logging.getLogger("aaa_engine.verify")
@@ -330,6 +331,14 @@ async def verify_authentication(
     )
 
     db.commit()
+
+    # Register for status polling
+    register_verification_request(
+        request_id=req_id,
+        decision=policy_output.decision,
+        reason_public=policy_output.reason_public,
+        risk_level=policy_output.risk_level,
+    )
 
     return VerificationResult(
         request_id=req_id,

@@ -106,6 +106,11 @@ STATIC_DIR = Path(__file__).parent.parent / "static"
 if STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
+# Serve AAA capture component (required for AAA-controlled capture)
+CAPTURE_DIR = Path(__file__).parent / "static" / "capture"
+if CAPTURE_DIR.exists():
+    app.mount("/static/capture", StaticFiles(directory=CAPTURE_DIR), name="capture")
+
 # Thresholds - now configurable via environment
 L2_SPOOF_THRESHOLD = settings.L2_SPOOF_THRESHOLD
 L1_SIMILARITY_THRESHOLD = settings.L1_SIMILARITY_THRESHOLD
