@@ -277,7 +277,7 @@ export function VerifyPage({ activeUser, onComplete }) {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.5rem', marginBottom: '0.5rem' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                  POST /auth/verify Full REST Response JSON
+                  POST /auth/verify Full REST Response JSON (Demo Mode - Shows Raw Scores)
                 </div>
                 {onComplete && (
                   <button className="btn-saas-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }} onClick={onComplete}>

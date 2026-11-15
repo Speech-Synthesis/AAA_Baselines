@@ -67,14 +67,14 @@ export const registerUser = async (name, email) => {
   }
 };
 
-// 2. Enroll Voice Sample
+// 2. Enroll Voice Sample (v1 API)
 export const enrollVoice = async (userId, audioBlob) => {
   const formData = new FormData();
   formData.append('user_id', userId);
   formData.append('audio', audioBlob, 'enrollment.wav');
 
   try {
-    const res = await client.post('/auth/enroll', formData, {
+    const res = await client.post('/v1/enroll', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return res.data;
@@ -85,10 +85,13 @@ export const enrollVoice = async (userId, audioBlob) => {
   }
 };
 
-// 3. Get Dynamic Challenge
+// 3. Get Dynamic Challenge (v1 API - POST method)
 export const getChallenge = async (userId) => {
   try {
-    const res = await client.get(`/auth/challenge?user_id=${userId}`);
+    const res = await client.post('/v1/challenges', {
+      user_id: userId,
+      purpose: 'authentication'
+    });
     return res.data;
   } catch (err) {
     console.error('Challenge API error:', err);
@@ -97,7 +100,8 @@ export const getChallenge = async (userId) => {
   }
 };
 
-// 4. Verify Voice Response
+// 4. Verify Voice Response (legacy endpoint for demo - shows raw scores for debugging)
+// Note: Production apps use /v1/verify which hides internal scores per API specification
 export const verifyVoice = async (userId, token, audioBlob) => {
   const formData = new FormData();
   formData.append('user_id', userId);

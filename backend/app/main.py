@@ -289,26 +289,11 @@ async def get_challenge(request: Request, user_id: str = Query(...), db: Session
     return ChallengeResponse(**challenge_data)
 
 
-@app.get("/v1/verification-requests/{request_id}")
-async def get_verification_request(request_id: str, db: Session = Depends(get_db)):
-    """
-    Query status of a verification request.
-    Conforms to API v1 contract and CallGuard getVerificationResult service.
-    """
-    log = db.query(AuthLog).order_by(AuthLog.created_at.desc()).first()
-    decision = Decision.APPROVE.value if (log and log.result == "ACCEPT") else Decision.DENY.value
-    return {
-        "request_id": request_id,
-        "decision": decision,
-        "status": "completed",
-        "reason_public": "REQUIRED_CHECKS_PASSED" if decision == "APPROVE" else "AUTHENTICATION_FAILED",
-        "risk_level": "LOW" if decision == "APPROVE" else "HIGH",
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+# NOTE: /v1/verification-requests/{request_id} is handled by api/v1/verification_requests.py router
+# The legacy endpoint was removed as it was dead code (incorrectly returned latest log ignoring request_id)
 
 
 @app.post("/auth/verify", response_model=VerifyResponse)
-@app.post("/v1/verify", response_model=VerifyResponse)
 @limiter.limit(settings.RATE_LIMIT_VERIFY)
 async def verify(
     request: Request,
