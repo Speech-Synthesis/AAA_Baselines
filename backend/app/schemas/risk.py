@@ -42,9 +42,15 @@ class RiskIndicator(str, Enum):
 class TranscriptRiskRequest(BaseModel):
     """Request payload for /v1/risk/transcript."""
 
-    session_id: str = Field(..., description="Unique call session reference")
-    transcript: str = Field(
-        ..., min_length=1, description="Spoken transcript string for acoustic/vishing analysis"
+    session_id: str | None = Field(default=None, description="Unique call session reference")
+    transcript: str | None = Field(
+        default=None, description="Spoken transcript string for acoustic/vishing analysis"
+    )
+    segments: list[dict[str, Any]] | None = Field(
+        default=None, description="Segmented call transcript from CallGuard"
+    )
+    tenant_id: str | None = Field(
+        default=None, description="Tenant identifier (e.g. callcentre_demo)"
     )
     context: dict[str, Any] | None = Field(
         default=None, description="Optional call metadata like call_type or claimed_identity"
@@ -68,3 +74,12 @@ class TranscriptRiskResponse(BaseModel):
         default="aaa-vr-transcript-risk-v1", description="Model engine version identifier"
     )
     analyzed_at: str = Field(..., description="ISO 8601 analysis timestamp")
+
+    # CallGuard UI compatibility fields (matching RiskPanel.jsx and api.js)
+    reason_public: str = Field(
+        default="ROUTINE_INQUIRY", description="Primary public reason category"
+    )
+    detected_triggers: list[str] = Field(
+        default_factory=list, description="Detected behavioral triggers"
+    )
+    timestamp: str = Field(default="", description="Analysis timestamp for UI")
