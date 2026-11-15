@@ -52,3 +52,14 @@ ISSUES_TODO.md
 # Test databases
 *.db
 test_*.db
+
+# Personal reports (not to be committed)
+/local_reports/surya/
+
+# Final PDF Report reference (do not commit to git)
+AAA_Engine_Final_Report.pdf
+
+
+# Submission Pack folder (local evidence & manual assets)
+MANUAL_SUBMISSION_PACK/
+

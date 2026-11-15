@@ -5,7 +5,6 @@ Shared Pydantic models for API requests and responses.
 
 import uuid
 from datetime import datetime
-from enum import Enum
 from enum import StrEnum
 from typing import Any
 

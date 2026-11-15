@@ -21,10 +21,27 @@ from .exceptions import (
     ValidationError,
     VoiceprintNotFoundError,
 )
+from .policy_engine import (
+    GateResult,
+    PolicyEngine,
+    PolicyInput,
+    PolicyOutput,
+    evaluate_policy,
+    get_policy_engine,
+)
 
 __all__ = [
+    # Config
     "get_settings",
     "Settings",
+    # Policy Engine
+    "PolicyEngine",
+    "PolicyInput",
+    "PolicyOutput",
+    "GateResult",
+    "evaluate_policy",
+    "get_policy_engine",
+    # Exceptions
     "AAAEngineError",
     "AuthenticationError",
     "InvalidTokenError",

@@ -63,7 +63,7 @@ export const demoCalls = [
     demo: true,
     riskLevel: "LOW",
     reasonPublic: "ROUTINE_TRANSACTION",
-    recommendedAction: "VERIFY_VOICE",
+    recommendedAction: "APPROVE",
     verificationStatus: "PENDING_CHALLENGE",
     transcript: [
       { id: "seg_1", speaker: "agent", text: "Thank you for calling Secure Trust. My name is Sarah. How can I help you today?", timestamp: "00:05" },
@@ -81,9 +81,9 @@ export const demoCalls = [
     scenarioName: "Scenario 2: Suspected Urgent Credential Solicit (Vishing)",
     scenarioDescription: "Caller claims urgent IT security lock, pressures agent, solicit password/OTP.",
     demo: true,
-    riskLevel: "HIGH",
+    riskLevel: "CRITICAL",
     reasonPublic: "URGENT_CREDENTIAL_SOLICITATION",
-    recommendedAction: "ESCALATE_HUMAN_REVIEW",
+    recommendedAction: "DENY",
     verificationStatus: "FAILED_CHALLENGE",
     transcript: [
       { id: "seg_10", speaker: "caller", text: "Listen to me, I am the director of corporate finance and my executive portal is locked right now!", timestamp: "00:04" },
@@ -103,12 +103,32 @@ export const demoCalls = [
     demo: true,
     riskLevel: "LOW",
     reasonPublic: "SECURITY_AWARENESS_WARNING",
-    recommendedAction: "NONE",
+    recommendedAction: "APPROVE",
     verificationStatus: "NOT_INITIATED",
     transcript: [
       { id: "seg_20", speaker: "agent", text: "As a security precaution from our Fraud Prevention Unit, remember we will never ask you to share your OTP or password.", timestamp: "00:08" },
       { id: "seg_21", speaker: "caller", text: "Thank you for the reminder. I received an odd text earlier asking for my code, which made me call you.", timestamp: "00:18" },
       { id: "seg_22", speaker: "agent", text: "You did the right thing. Let us verify your account safely.", timestamp: "00:27" }
+    ]
+  },
+  {
+    id: "CALL-2026-1004",
+    customerRef: "customer_002",
+    channel: "Inbound Customer Support",
+    status: "IN_PROGRESS",
+    duration: 65,
+    scenarioName: "Scenario 4: Address Change Request",
+    scenarioDescription: "Customer requests update to registered address and unverified beneficiary details.",
+    demo: true,
+    riskLevel: "MEDIUM",
+    reasonPublic: "UNVERIFIED_BENEFICIARY",
+    recommendedAction: "REVIEW",
+    verificationStatus: "NOT_INITIATED",
+    transcript: [
+      { id: "seg_30", speaker: "agent", text: "Thank you for calling Secure Trust. My name is Sarah. How may I assist you today?", timestamp: "00:05" },
+      { id: "seg_31", speaker: "caller", text: "Hello, I recently moved to a new address. I would like to update my registered address and change the beneficiary details on my account. Can you help me verify the changes?", timestamp: "00:15" },
+      { id: "seg_32", speaker: "agent", text: "I can assist with that. Updating registered addresses and adding an unverified beneficiary requires standard security review.", timestamp: "00:26" },
+      { id: "seg_33", speaker: "caller", text: "Understood, I have the required documents ready for review whenever needed.", timestamp: "00:34" }
     ]
   }
 ];

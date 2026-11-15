@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAA Voice Capture</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .capture-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 32px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .aaa-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+
+        .aaa-badge::before {
+            content: '\1F510';
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #334155;
+        }
+
+        .phrase-display {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: 500;
+            margin: 20px 0;
+            line-height: 1.4;
+        }
+
+        .countdown {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+
+        .countdown.warning {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-record {
+            background: #22c55e;
+            color: white;
+        }
+
+        .btn-record:hover:not(:disabled) {
+            background: #16a34a;
+        }
+
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #dc2626;
+        }
+
+        .btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .recording-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .pulse {
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-processing {
+            background: #e0f2fe;
+            color: #075985;
+        }
+
+        .result-display {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .result-approve {
+            background: #dcfce7;
+            border: 1px solid #22c55e;
+        }
+
+        .result-deny {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+        }
+
+        .result-stepup, .result-review {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+        }
+
+        .result-unavailable {
+            background: #f1f5f9;
+            border: 1px solid #94a3b8;
+        }
+
+        .result-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .security-note {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="capture-container">
+        <div class="aaa-badge">AAA Secure Capture</div>
+
+        <!-- Initial / Recording State -->
+        <div id="capture-view">
+            <h2>Please say the phrase below:</h2>
+            <div id="phrase-display" class="phrase-display">Loading...</div>
+            <div id="countdown" class="countdown">Time remaining: --s</div>
+
+            <div id="recording-indicator" class="recording-indicator hidden">
+                <span class="pulse"></span>
+                <span>Recording...</span>
+            </div>
+
+            <button id="btn-record" class="btn btn-record" disabled>
+                Start Recording
+            </button>
+            <button id="btn-stop" class="btn btn-stop hidden">
+                Stop Recording
+            </button>
+
+            <div id="status" class="status-message hidden"></div>
+        </div>
+
+        <!-- Result State -->
+        <div id="result-view" class="hidden">
+            <div id="result-display" class="result-display">
+                <div id="result-icon" class="result-icon"></div>
+                <h2 id="result-title"></h2>
+                <p id="result-message"></p>
+            </div>
+        </div>
+
+        <div class="security-note">
+            Audio is processed securely by AAA and is not stored or shared with the host application.
+        </div>
+    </div>
+
+    <script>
+        /**
+         * AAA Capture Component
+         *
+         * This component is controlled by AAA, not the host application.
+         * It records audio and uploads directly to AAA.
+         * Host apps receive only safe status information via postMessage.
+         */
+
+        const API_BASE = window.location.origin;
+        let grantId = null;
+        let grantSig = null;
+        let challengeId = null;
+        let userId = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let stream = null;
+        let countdownInterval = null;
+        let remainingSeconds = 90;
+
+        // DOM elements
+        const captureView = document.getElementById('capture-view');
+        const resultView = document.getElementById('result-view');
+        const phraseDisplay = document.getElementById('phrase-display');
+        const countdownDisplay = document.getElementById('countdown');
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const statusDiv = document.getElementById('status');
+
+        // Initialize
+        async function init() {
+            // Parse URL params
+            const params = new URLSearchParams(window.location.search);
+            grantId = params.get('grant');
+            grantSig = params.get('sig');
+
+            if (!grantId || !grantSig) {
+                showError('Invalid capture parameters');
+                notifyParent({ type: 'error', error: 'INVALID_PARAMS' });
+                return;
+            }
+
+            // Validate grant and get challenge info
+            try {
+                const response = await fetch(
+                    `${API_BASE}/v1/capture/grants/${grantId}/status?sig=${grantSig}`
+                );
+                const data = await response.json();
+
+                if (!data.valid) {
+                    showError(getErrorMessage(data.error));
+                    notifyParent({ type: 'error', error: data.error });
+                    return;
+                }
+
+                // Store info
+                challengeId = data.challenge_id;
+                userId = data.user_id;
+                remainingSeconds = data.expires_in_seconds;
+
+                // Display phrase
+                phraseDisplay.textContent = `"${data.phrase}"`;
+
+                // Start countdown
+                startCountdown();
+
+                // Enable recording
+                btnRecord.disabled = false;
+                notifyParent({ type: 'ready', phrase: data.phrase });
+
+            } catch (err) {
+                showError('Failed to validate capture grant');
+                notifyParent({ type: 'error', error: 'VALIDATION_FAILED' });
+            }
+        }
+
+        function getErrorMessage(code) {
+            const messages = {
+                'GRANT_NOT_FOUND': 'Capture session not found. Please try again.',
+                'INVALID_SIGNATURE': 'Invalid capture authorization.',
+                'GRANT_EXPIRED': 'Capture session expired. Please request a new challenge.',
+                'GRANT_CONSUMED': 'This capture session has already been used.'
+            };
+            return messages[code] || 'An error occurred.';
+        }
+
+        function startCountdown() {
+            updateCountdown();
+            countdownInterval = setInterval(() => {
+                remainingSeconds--;
+                updateCountdown();
+                if (remainingSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    btnRecord.disabled = true;
+                    showError('Time expired. Please request a new challenge.');
+                    notifyParent({ type: 'expired' });
+                }
+            }, 1000);
+        }
+
+        function updateCountdown() {
+            countdownDisplay.textContent = `Time remaining: ${remainingSeconds}s`;
+            countdownDisplay.classList.toggle('warning', remainingSeconds < 30);
+        }
+
+        // Recording functions
+        btnRecord.addEventListener('click', startRecording);
+        btnStop.addEventListener('click', stopRecording);
+
+        async function startRecording() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 16000
+                    }
+                });
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    submitAudio(audioBlob);
+                };
+
+                mediaRecorder.start();
+
+                // Update UI
+                btnRecord.classList.add('hidden');
+                btnStop.classList.remove('hidden');
+                recordingIndicator.classList.remove('hidden');
+                notifyParent({ type: 'recording_started' });
+
+                // Auto-stop after 6 seconds
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        stopRecording();
+                    }
+                }, 6000);
+
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access.');
+                } else {
+                    showError('Could not access microphone.');
+                }
+                notifyParent({ type: 'error', error: 'MIC_ACCESS_DENIED' });
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+
+            btnStop.classList.add('hidden');
+            recordingIndicator.classList.add('hidden');
+            clearInterval(countdownInterval);
+
+            showStatus('Processing your voice...', 'processing');
+            notifyParent({ type: 'recording_stopped' });
+        }
+
+        async function submitAudio(audioBlob) {
+            showStatus('Verifying...', 'processing');
+
+            try {
+                // Create form data - upload directly to AAA
+                const formData = new FormData();
+                formData.append('user_id', userId);
+                formData.append('token', challengeId);
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                const response = await fetch(`${API_BASE}/v1/verify`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                // Consume the grant to prevent reuse
+                await fetch(`${API_BASE}/v1/capture/grants/${grantId}/consume`, {
+                    method: 'POST'
+                });
+
+                // Clear audio data
+                audioChunks = [];
+
+                // Show result
+                showResult(result);
+
+                // Notify parent with safe info only (no raw scores)
+                notifyParent({
+                    type: 'verification_complete',
+                    decision: result.decision,
+                    reason_public: result.reason_public,
+                    risk_level: result.risk_level,
+                    session_id: result.session_id,
+                    requires_fresh_challenge: result.requires_fresh_challenge,
+                    requires_human_review: result.requires_human_review
+                });
+
+            } catch (err) {
+                showError('Verification failed. Please try again.');
+                notifyParent({ type: 'error', error: 'VERIFICATION_FAILED' });
+            }
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message status-${type}`;
+            statusDiv.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            showStatus(message, 'error');
+        }
+
+        function showResult(result) {
+            captureView.classList.add('hidden');
+            resultView.classList.remove('hidden');
+
+            const resultDisplay = document.getElementById('result-display');
+            const resultIcon = document.getElementById('result-icon');
+            const resultTitle = document.getElementById('result-title');
+            const resultMessage = document.getElementById('result-message');
+
+            const configs = {
+                'APPROVE': {
+                    class: 'result-approve',
+                    icon: '\u2705',
+                    title: 'Verified',
+                    message: 'Your identity has been confirmed.'
+                },
+                'DENY': {
+                    class: 'result-deny',
+                    icon: '\u274C',
+                    title: 'Verification Failed',
+                    message: result.reason_public || 'Please try again.'
+                },
+                'STEP_UP': {
+                    class: 'result-stepup',
+                    icon: '\u{1F504}',
+                    title: 'Additional Verification Needed',
+                    message: 'Please try again with a fresh challenge.'
+                },
+                'REVIEW': {
+                    class: 'result-review',
+                    icon: '\u{1F50D}',
+                    title: 'Review Required',
+                    message: 'A security review is required.'
+                },
+                'UNAVAILABLE': {
+                    class: 'result-unavailable',
+                    icon: '\u26A0',
+                    title: 'Service Unavailable',
+                    message: 'Please try again later.'
+                }
+            };
+
+            const config = configs[result.decision] || configs['DENY'];
+            resultDisplay.className = `result-display ${config.class}`;
+            resultIcon.textContent = config.icon;
+            resultTitle.textContent = config.title;
+            resultMessage.textContent = config.message;
+        }
+
+        // Communication with parent (host app)
+        function notifyParent(message) {
+            // Validate parent origin for security
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    source: 'aaa-capture',
+                    ...message
+                }, '*'); // In production, restrict to known origins
+            }
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', (event) => {
+            // In production, validate event.origin
+            if (event.data && event.data.type === 'aaa-capture-init') {
+                // Parent can send initialization data if needed
+            }
+        });
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            audioChunks = [];
+        });
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
