@@ -1,19 +1,37 @@
 /**
  * CallGuard API Service Layer
- * 
+ *
  * Target Contract: AAA Engine Public REST API v1.0
  * Specified in 03_SYSTEM_REFERENCES/API_SPECIFICATION.md
- * 
+ *
  * Strict Security Rules:
  * 1. CallGuard frontend NEVER receives, stores, or forwards raw audio.
  * 2. AAA-controlled capture component uploads directly to AAA over /v1/verify.
  * 3. No AAA client secrets or service-role keys are placed in frontend code.
- * 4. Mode: Configurable Mock Adapter (Day 1 Integration Preparation).
+ *
+ * Mode Configuration:
+ * - Production: VITE_USE_MOCK_API=false (calls real AAA backend)
+ * - Development: VITE_USE_MOCK_API=true (isolated mock adapter for UI testing only)
+ *
+ * IMPORTANT: Mock mode is for UI development ONLY. All five decision outcomes
+ * (APPROVE, DENY, STEP_UP, REVIEW, UNAVAILABLE) originate from backend PolicyEngine.
  */
 
-const USE_MOCK = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_USE_MOCK_API === "false" ? false : true; // Defaults to true
+// Environment detection - production builds MUST set VITE_USE_MOCK_API=false
+const IS_PRODUCTION = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.PROD === true;
+const MOCK_EXPLICITLY_DISABLED = typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_USE_MOCK_API === "false";
+
+// Mock mode: ONLY enabled in development when explicitly NOT disabled
+// Production builds should ALWAYS have mock disabled
+const USE_MOCK = IS_PRODUCTION ? false : !MOCK_EXPLICITLY_DISABLED;
+
 const API_BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_AAA_API_BASE_URL) || "http://localhost:8000";
 const DEMO_TENANT = "callcentre_demo";
+
+// Log mode on initialization (development only)
+if (!IS_PRODUCTION) {
+  console.info(`[CallGuard API] Mode: ${USE_MOCK ? 'MOCK (dev only)' : 'LIVE'}, Backend: ${API_BASE}`);
+}
 
 /**
  * Request a fresh challenge session from AAA.
@@ -70,25 +88,45 @@ export async function createChallenge(userRef, purpose = "callcentre_high_risk_v
 /**
  * Poll or fetch verification request outcome.
  * Calls GET /v1/verification-requests/{request_id}
- * 
+ *
+ * Returns one of FIVE approved decisions per SYSTEM.md §6:
+ * - APPROVE: All gates pass
+ * - DENY: Authentication fails
+ * - STEP_UP: Additional verification needed (fresh challenge)
+ * - REVIEW: Human review required
+ * - UNAVAILABLE: Service unavailable
+ *
+ * IMPORTANT: In production, all decisions originate from backend PolicyEngine.
+ * Mock responses are for UI development only and do NOT represent real authentication.
+ *
  * @param {string} requestId
  */
 export async function getVerificationResult(requestId) {
-  if (USE_MOCK) {
-    return {
-      request_id: requestId,
-      decision: "APPROVE",
-      reason_public: "REQUIRED_CHECKS_PASSED",
-      risk_level: "LOW",
-      api_version: "v1",
-      timestamp: new Date().toISOString(),
-      _mock: true
-    };
+  // === PRODUCTION PATH: Real backend call ===
+  if (!USE_MOCK) {
+    const res = await fetch(`${API_BASE}/v1/verification-requests/${requestId}`);
+    if (!res.ok) throw new Error(`Verification status query failed: ${res.statusText}`);
+    return await res.json();
   }
 
-  const res = await fetch(`${API_BASE}/v1/verification-requests/${requestId}`);
-  if (!res.ok) throw new Error(`Verification status query failed: ${res.statusText}`);
-  return await res.json();
+  // === DEVELOPMENT MOCK PATH (UI testing only) ===
+  // WARNING: These responses do NOT reflect real PolicyEngine decisions
+  console.warn('[CallGuard API] MOCK MODE: Returning simulated verification result');
+  const sessionId = "sess_mock_" + Math.random().toString(36).substring(2, 10);
+
+  // Default mock response for development - always returns APPROVE
+  // Use ActiveCall simulation buttons to test other outcomes
+  return {
+    request_id: requestId,
+    decision: "APPROVE",
+    reason_public: "OK",
+    risk_level: "LOW",
+    session_id: sessionId,
+    api_version: "v1",
+    timestamp: new Date().toISOString(),
+    _mock: true,
+    _warning: "MOCK MODE - Use simulation buttons to test all 5 outcomes"
+  };
 }
 
 /**

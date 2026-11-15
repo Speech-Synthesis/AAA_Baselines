@@ -98,6 +98,9 @@ export default function RiskPanel({ riskData, onReevaluate, isAnalyzing }) {
     }
   };
 
+  /**
+   * Get color for each of the FIVE approved decision outcomes per SYSTEM.md §6.
+   */
   const getActionColor = (action) => {
     switch (action) {
       case 'DENY':
@@ -108,21 +111,28 @@ export default function RiskPanel({ riskData, onReevaluate, isAnalyzing }) {
         return 'var(--risk-medium)';
       case 'APPROVE':
         return 'var(--risk-low)';
+      case 'UNAVAILABLE':
+        return '#94a3b8';
       default:
         return 'var(--text-main)';
     }
   };
 
+  /**
+   * Get description for each of the FIVE approved decision outcomes per SYSTEM.md §6.
+   */
   const getActionDescription = (action) => {
     switch (action) {
       case 'DENY':
         return 'Severe threat / credential harvesting detected. Escalate immediately to Fraud Operations desk.';
       case 'STEP_UP':
-        return 'Multiple risk markers present. Trigger AAA voice biometric challenge.';
+        return 'Multiple risk markers present. Trigger AAA voice biometric challenge with fresh phrase.';
       case 'REVIEW':
-        return 'Single risk marker present. Prompt agent to exercise standard verification caution.';
+        return 'Risk marker(s) present. Human review required before proceeding with transaction.';
       case 'APPROVE':
         return 'Normal call flow. No abnormal vishing signals detected.';
+      case 'UNAVAILABLE':
+        return 'Authentication service temporarily unavailable. Apply fail-closed protocol and retry later.';
       default:
         return 'Proceed with standard operational protocol.';
     }

@@ -57,30 +57,71 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
     }
   };
 
-  const handleSimulateCustomerResponse = (success = true) => {
+  /**
+   * Simulate customer voice verification response.
+   * Maps to one of FIVE approved decisions per SYSTEM.md §6:
+   * - APPROVE: All gates pass
+   * - DENY: Authentication fails
+   * - STEP_UP: Additional verification needed
+   * - REVIEW: Human review required
+   * - UNAVAILABLE: Service unavailable
+   */
+  const handleSimulateCustomerResponse = (outcomeType = 'APPROVE') => {
     // In approved AAA architecture:
     // User speaks phrase into AAA-controlled capture component.
     // Component uploads directly to AAA POST /v1/verify.
     // Host backend queries final safe decision.
     const requestId = "req_" + Math.random().toString(36).substring(2, 10);
-    const outcome = success ? {
-      decision: "APPROVE",
-      risk_level: "LOW",
-      reason_public: "REQUIRED_CHECKS_PASSED",
-      details: "Exact phrase matched deterministically (OK). Speaker biometric confirmed.",
-      requestId
-    } : {
-      decision: "DENY",
-      risk_level: "HIGH",
-      reason_public: "CHALLENGE_MISMATCH",
-      details: "Spoken phrase mismatch or near-miss detected by AAA-ASR verifier.",
-      requestId
+
+    const outcomes = {
+      APPROVE: {
+        decision: "APPROVE",
+        risk_level: "LOW",
+        reason_public: "OK",
+        details: "Exact phrase matched deterministically (OK). Speaker biometric confirmed."
+      },
+      DENY: {
+        decision: "DENY",
+        risk_level: "HIGH",
+        reason_public: "AUTH_FAILED",
+        details: "Spoken phrase mismatch or speaker verification failed."
+      },
+      STEP_UP: {
+        decision: "STEP_UP",
+        risk_level: "LOW",
+        reason_public: "TRY_AGAIN",
+        details: "Additional verification required. Please request a fresh challenge.",
+        requires_fresh_challenge: true
+      },
+      REVIEW: {
+        decision: "REVIEW",
+        risk_level: "HIGH",
+        reason_public: "REVIEW_REQUIRED",
+        details: "Human review required. Transaction hold applied pending supervisor approval.",
+        requires_human_review: true
+      },
+      UNAVAILABLE: {
+        decision: "UNAVAILABLE",
+        risk_level: "MEDIUM",
+        reason_public: "SERVICE_UNAVAILABLE",
+        details: "Authentication service temporarily unavailable. Please try again later."
+      }
     };
+
+    const outcome = { ...outcomes[outcomeType], requestId };
 
     setVerificationOutcome(outcome);
     setChallengeSession(null);
 
     // Record in audit log
+    const actionMessages = {
+      APPROVE: "Voice verification APPROVED",
+      DENY: "Voice verification DENIED - Prompt Escalation",
+      STEP_UP: "Voice verification STEP_UP - Fresh challenge required",
+      REVIEW: "Voice verification REVIEW - Human review pending",
+      UNAVAILABLE: "Voice verification UNAVAILABLE - Service error"
+    };
+
     onAddAuditLog({
       id: "AUD-" + Math.floor(Math.random() * 9000 + 1000),
       timestamp: new Date().toISOString(),
@@ -90,7 +131,7 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
       decision: outcome.decision,
       riskLevel: outcome.risk_level,
       reasonPublic: outcome.reason_public,
-      actionTaken: success ? "Voice verification APPROVED" : "Voice verification DENIED - Prompt Escalation"
+      actionTaken: actionMessages[outcomeType]
     });
   };
 
@@ -206,34 +247,78 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
                   🔒 <strong>Direct Upload Guardrail:</strong> AAA capture component streams audio straight to <code>{challengeSession.capture.upload_url}</code> using short-lived capture grant. CallGuard never proxies raw audio.
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => handleSimulateCustomerResponse(true)}
+                    onClick={() => handleSimulateCustomerResponse('APPROVE')}
                   >
-                    Simulate: Caller Speaks Exact Phrase (OK)
+                    ✓ APPROVE
                   </button>
-                  <button 
+                  <button
                     className="btn btn-danger btn-sm"
-                    onClick={() => handleSimulateCustomerResponse(false)}
+                    onClick={() => handleSimulateCustomerResponse('DENY')}
                   >
-                    Simulate: Caller Speaks Near-Miss / Wrong Phrase (DENIED)
+                    ✗ DENY
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: '#f97316', color: 'white' }}
+                    onClick={() => handleSimulateCustomerResponse('STEP_UP')}
+                  >
+                    ↻ STEP_UP
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: '#eab308', color: 'black' }}
+                    onClick={() => handleSimulateCustomerResponse('REVIEW')}
+                  >
+                    👁 REVIEW
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleSimulateCustomerResponse('UNAVAILABLE')}
+                  >
+                    ⚠ UNAVAILABLE
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Verification Outcome Display */}
+            {/* Verification Outcome Display - All 5 Decision Types */}
             {verificationOutcome && (
-              <div style={{ 
-                marginTop: '16px', 
-                padding: '16px', 
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
                 borderRadius: '8px',
-                background: verificationOutcome.decision === 'APPROVE' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                border: `1px solid ${verificationOutcome.decision === 'APPROVE' ? 'var(--risk-low)' : 'var(--risk-high)'}`
+                background: {
+                  APPROVE: 'rgba(16, 185, 129, 0.1)',
+                  DENY: 'rgba(239, 68, 68, 0.1)',
+                  STEP_UP: 'rgba(249, 115, 22, 0.1)',
+                  REVIEW: 'rgba(234, 179, 8, 0.1)',
+                  UNAVAILABLE: 'rgba(148, 163, 184, 0.1)'
+                }[verificationOutcome.decision] || 'rgba(148, 163, 184, 0.1)',
+                border: `1px solid ${
+                  {
+                    APPROVE: 'var(--risk-low)',
+                    DENY: 'var(--risk-high)',
+                    STEP_UP: '#f97316',
+                    REVIEW: '#eab308',
+                    UNAVAILABLE: 'var(--text-muted)'
+                  }[verificationOutcome.decision] || 'var(--border)'
+                }`
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '1rem', color: verificationOutcome.decision === 'APPROVE' ? 'var(--risk-low)' : 'var(--risk-high)' }}>
+                  <div style={{
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    color: {
+                      APPROVE: 'var(--risk-low)',
+                      DENY: 'var(--risk-high)',
+                      STEP_UP: '#f97316',
+                      REVIEW: '#eab308',
+                      UNAVAILABLE: 'var(--text-muted)'
+                    }[verificationOutcome.decision] || 'var(--text-main)'
+                  }}>
                     DECISION: {verificationOutcome.decision}
                   </div>
                   <span className="badge badge-blue">Req: {verificationOutcome.requestId}</span>
@@ -244,8 +329,18 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   {verificationOutcome.details}
                 </div>
-                <button 
-                  className="btn btn-secondary btn-sm" 
+                {verificationOutcome.requires_fresh_challenge && (
+                  <div style={{ fontSize: '0.8rem', color: '#f97316', marginTop: '6px', fontStyle: 'italic' }}>
+                    ↻ A fresh challenge is required. Click "Initiate Customer Voice Verification" to retry.
+                  </div>
+                )}
+                {verificationOutcome.requires_human_review && (
+                  <div style={{ fontSize: '0.8rem', color: '#eab308', marginTop: '6px', fontStyle: 'italic' }}>
+                    👁 Human review pending. Supervisor will be notified.
+                  </div>
+                )}
+                <button
+                  className="btn btn-secondary btn-sm"
                   style={{ marginTop: '12px' }}
                   onClick={() => setVerificationOutcome(null)}
                 >
