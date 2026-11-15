@@ -5,10 +5,8 @@ Updated for AAA Engine Day 1: Integrates with aaa_asr deterministic exact phrase
 """
 from __future__ import annotations
 
-import difflib
 import io
 import os
-import re
 import sys
 
 # Fix Windows console encoding issues
