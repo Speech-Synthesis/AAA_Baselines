@@ -1,0 +1,910 @@
+/**
+ * Banking Shield Styles
+ * AAA Voice Authentication Demo - Banking Application
+ */
+
+/* Reset and Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #f0f0f0;
+  min-height: 100vh;
+}
+
+.app-container {
+  min-height: 100vh;
+}
+
+/* Typography */
+h1, h2, h3 {
+  font-weight: 600;
+}
+
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+h3 { font-size: 1rem; }
+
+/* Common Components */
+.card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+/* Login Page */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.shield-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #a0a0a0;
+  margin-top: 0.5rem;
+}
+
+.login-form {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #d0d0d0;
+  font-size: 0.875rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+}
+
+.form-group input::placeholder {
+  color: #808080;
+}
+
+.login-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  border: none;
+  padding: 0.875rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+}
+
+.demo-accounts {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.demo-accounts h3 {
+  margin-bottom: 0.75rem;
+  color: #a0a0a0;
+}
+
+.demo-accounts table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.demo-accounts th,
+.demo-accounts td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.demo-accounts th {
+  color: #808080;
+  font-weight: 500;
+}
+
+.aaa-badge {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #606060;
+  font-size: 0.75rem;
+}
+
+/* Dashboard */
+.dashboard-page,
+.transactions-page,
+.enrollment-page,
+.verification-page {
+  min-height: 100vh;
+}
+
+.dashboard-header,
+.page-header {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-left .shield-icon {
+  font-size: 1.5rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-name {
+  color: #a0a0a0;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f0f0f0;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.back-link {
+  color: #a0a0a0;
+  text-decoration: none;
+}
+
+.dashboard-content,
+.transactions-content,
+.enrollment-content,
+.verification-content {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard-grid,
+.transactions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Account Section */
+.total-balance {
+  text-align: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.total-balance .label {
+  display: block;
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.total-balance .amount {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.account-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.account-icon {
+  font-size: 1.5rem;
+}
+
+.account-details {
+  flex: 1;
+}
+
+.account-name {
+  display: block;
+  font-weight: 500;
+}
+
+.account-number {
+  display: block;
+  font-size: 0.75rem;
+  color: #808080;
+}
+
+.account-balance {
+  text-align: right;
+}
+
+.balance-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #808080;
+}
+
+.balance-amount {
+  display: block;
+  font-weight: 600;
+  color: #4ade80;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.action-btn .icon {
+  font-size: 1.5rem;
+}
+
+.action-btn.enroll {
+  border-color: #4f46e5;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border: none;
+}
+
+/* Voice Status */
+.status-indicator {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.status.enrolled {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  display: flex;
+  gap: 1rem;
+}
+
+.status.not-enrolled {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  display: flex;
+  gap: 1rem;
+}
+
+.status-icon {
+  font-size: 2rem;
+}
+
+.enroll-link {
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.aaa-health {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.healthy {
+  color: #4ade80;
+}
+
+.unhealthy {
+  color: #f87171;
+}
+
+/* Transaction List */
+.transaction-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transaction-list th,
+.transaction-list td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.transaction-list th {
+  color: #808080;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.tx-amount.credit {
+  color: #4ade80;
+}
+
+.tx-amount.debit {
+  color: #f87171;
+}
+
+.tx-type {
+  text-transform: capitalize;
+  font-size: 0.75rem;
+  color: #808080;
+}
+
+/* Account Selector */
+.account-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.account-tab {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-tab.active {
+  background: rgba(79, 70, 229, 0.3);
+  border-color: #4f46e5;
+}
+
+.account-tab .acc-name {
+  display: block;
+  font-weight: 500;
+}
+
+.account-tab .acc-balance {
+  display: block;
+  font-size: 0.875rem;
+  color: #4ade80;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal h2 {
+  margin-bottom: 1.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.hint {
+  display: block;
+  margin-top: 0.25rem;
+  color: #808080;
+  font-size: 0.75rem;
+}
+
+/* Risk Panel */
+.risk-panel {
+  border-left: 4px solid;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0 8px 8px 0;
+}
+
+.risk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.risk-level {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-icon {
+  font-size: 1.5rem;
+}
+
+.risk-label {
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #808080;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.action-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.action-badge.approve { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+.action-badge.deny { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.action-badge.step-up { background: rgba(234, 179, 8, 0.2); color: #fbbf24; }
+.action-badge.review { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+/* Enrollment & Verification */
+.consent-card,
+.recording-card,
+.complete-card,
+.verification-card,
+.result-card {
+  max-width: 500px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.consent-icon,
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.consent-text {
+  color: #a0a0a0;
+  margin-bottom: 1.5rem;
+}
+
+.consent-details {
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.consent-details ul {
+  list-style: none;
+  margin-top: 0.5rem;
+}
+
+.consent-details li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.consent-details li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #4ade80;
+}
+
+.consent-agreement {
+  font-size: 0.875rem;
+  color: #808080;
+  margin-bottom: 1.5rem;
+}
+
+.btn-primary.large {
+  font-size: 1.125rem;
+  padding: 1rem 2rem;
+}
+
+/* Recording */
+.progress-indicator {
+  margin-bottom: 1.5rem;
+}
+
+.progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4f46e5;
+  transition: width 0.3s;
+}
+
+.challenge-display {
+  margin: 2rem 0;
+}
+
+.challenge-phrase {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #4f46e5;
+  padding: 1rem;
+  background: rgba(79, 70, 229, 0.1);
+  border-radius: 8px;
+}
+
+.recording-controls {
+  margin: 2rem 0;
+}
+
+.btn-record {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: white;
+  border: none;
+  padding: 1.5rem 3rem;
+  border-radius: 50px;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.btn-record:disabled {
+  opacity: 0.5;
+}
+
+.btn-stop {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.recording-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.pulse {
+  width: 12px;
+  height: 12px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+.recording-tips {
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1.5rem;
+}
+
+.recording-tips h4 {
+  margin-bottom: 0.5rem;
+  color: #808080;
+}
+
+.recording-tips ul {
+  list-style: none;
+}
+
+.recording-tips li {
+  padding: 0.25rem 0;
+  color: #a0a0a0;
+  font-size: 0.875rem;
+}
+
+/* Verification */
+.countdown-display {
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.countdown-display .warning {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.pending-transfer-banner {
+  background: rgba(79, 70, 229, 0.2);
+  border: 1px solid rgba(79, 70, 229, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 1rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.verification-info {
+  margin-top: 1.5rem;
+  color: #808080;
+  font-size: 0.875rem;
+}
+
+.result-display {
+  padding: 2rem;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+.result-display.approve {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.result-display.deny {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.result-display.step_up {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.result-display.review {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.result-display.unavailable {
+  background: rgba(156, 163, 175, 0.1);
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.result-icon.step-up { color: #fbbf24; }
+.result-icon.review { color: #60a5fa; }
+.result-icon.unavailable { color: #9ca3af; }
+
+.review-note {
+  font-size: 0.875rem;
+  color: #60a5fa;
+  margin-top: 0.5rem;
+}
+
+.review-pending {
+  color: #60a5fa;
+  font-style: italic;
+}
+
+.result-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.transfer-approved {
+  color: #4ade80;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.verification-prompt {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.verify-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Audit History */
+.audit-history {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-list {
+  list-style: none;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.event-icon {
+  font-size: 1.25rem;
+}
+
+.event-details {
+  flex: 1;
+}
+
+.event-type {
+  display: block;
+  font-weight: 500;
+  text-transform: capitalize;
+  font-size: 0.875rem;
+}
+
+.event-time {
+  display: block;
+  font-size: 0.75rem;
+  color: #808080;
+}
+
+.event-result {
+  text-align: right;
+}
+
+.decision {
+  display: block;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.decision.success { color: #4ade80; }
+.decision.error { color: #f87171; }
+.decision.warning { color: #fbbf24; }
+
+.reason {
+  display: block;
+  font-size: 0.625rem;
+  color: #808080;
+}
