@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
-from ...core.policy_engine import GateResult, PolicyEngine, PolicyInput, evaluate_policy
+from ...core.policy_engine import GateResult, PolicyInput, evaluate_policy
 from ...core.ratelimit import limiter
 from ...db import get_db
 from ...layer1_speaker import verify_speaker
@@ -240,20 +240,20 @@ async def verify_authentication(
             logger.error(f"[{req_id}] ASR layer failed: {asr_result}")
             policy_input.asr_available = False
             policy_input.asr_result = GateResult.TIMEOUT
-            asr_match, asr_similarity, asr_transcript = False, 0.0, ""
+            asr_match, asr_similarity, _ = False, 0.0, ""
         else:
-            asr_match, asr_similarity, asr_transcript = asr_result
+            asr_match, asr_similarity, _ = asr_result
             policy_input.asr_available = True
             policy_input.asr_confidence = asr_similarity
             policy_input.asr_match = asr_match
             policy_input.asr_result = GateResult.PASS if asr_match else GateResult.FAIL
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"[{req_id}] Parallel execution timeout")
         policy_input.ad_available = False
         policy_input.asr_available = False
         l2_label, l2_confidence = "timeout", 0.0
-        asr_match, asr_similarity, asr_transcript = False, 0.0, ""
+        asr_match, asr_similarity, _ = False, 0.0, ""
 
     logger.info(f"[{req_id}] Parallel execution complete: AD={policy_input.ad_result}, ASR={policy_input.asr_result}")
 
