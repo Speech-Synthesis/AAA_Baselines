@@ -1,0 +1,55 @@
+-- Migration 001: Initial Schema Documentation
+-- Status: APPLIED (via Supabase console)
+-- Date: 2026-11-12
+-- Author: Navadeep (models.py), Surya (Supabase setup)
+--
+-- This migration documents the initial schema created in Supabase.
+-- Tables: users, voiceprints, challenges, auth_logs
+-- Extensions: uuid-ossp, pgcrypto
+-- RLS: Enabled on all tables
+--
+-- NOTE: This file is for documentation only.
+-- The schema was created manually via Supabase dashboard.
+
+-- Schema was created with:
+-- CREATE TABLE users (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   name TEXT NOT NULL,
+--   email TEXT NOT NULL UNIQUE,
+--   created_at TIMESTAMP DEFAULT now()
+-- );
+--
+-- CREATE TABLE voiceprints (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID NOT NULL REFERENCES users(id),
+--   embedding FLOAT8[] NOT NULL,
+--   sample_count INTEGER NOT NULL DEFAULT 1,
+--   updated_at TIMESTAMP DEFAULT now(),
+--   UNIQUE(user_id)
+-- );
+--
+-- CREATE TABLE challenges (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID NOT NULL REFERENCES users(id),
+--   phrase TEXT NOT NULL,
+--   token TEXT NOT NULL,
+--   expires_at TIMESTAMP NOT NULL,
+--   used BOOLEAN NOT NULL DEFAULT false
+-- );
+--
+-- CREATE TABLE auth_logs (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID REFERENCES users(id),
+--   challenge_id UUID REFERENCES challenges(id),
+--   l2_label TEXT,
+--   l2_confidence DOUBLE PRECISION,
+--   l1_score DOUBLE PRECISION,
+--   result TEXT,
+--   layer_blocked INTEGER,
+--   created_at TIMESTAMP DEFAULT now()
+-- );
+--
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE voiceprints ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE challenges ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE auth_logs ENABLE ROW LEVEL SECURITY;
