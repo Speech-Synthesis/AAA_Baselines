@@ -9,7 +9,6 @@ Role: Security & Perimeter Defense Engineer
 import hashlib
 import json
 import os
-from typing import List, Optional, Tuple
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -134,6 +133,6 @@ def derive_tenant_voiceprint_key(tenant_id: str, master_key: bytes | None = None
         algorithm=hashes.SHA256(),
         length=KEY_SIZE_BYTES,
         salt=None,
-        info=f"tenant-isolation-key:{tenant_id}".encode("utf-8"),
+        info=f"tenant-isolation-key:{tenant_id}".encode(),
     )
     return hkdf.derive(master)
