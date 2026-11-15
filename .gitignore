@@ -15,6 +15,7 @@ env/
 dist/
 build/
 pretrained_models/
+models/
 
 # Node
 node_modules/

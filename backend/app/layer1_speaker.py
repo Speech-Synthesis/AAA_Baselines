@@ -1,9 +1,12 @@
 """
 Layer 1 — Speaker Verification - Surya
-Uses speechbrain/spkrec-ecapa-voxceleb for 192-dim embeddings
+ECAPA-TDNN for 192-dim speaker embeddings
+Loads from local models/sv if available, falls back to HuggingFace
 """
 
 import io
+import os
+from pathlib import Path
 
 import numpy as np
 import soundfile as sf
@@ -12,15 +15,47 @@ from scipy import signal
 from speechbrain.inference.speaker import EncoderClassifier
 from speechbrain.utils.fetching import LocalStrategy
 
-# Load model once at module import (not per-request)
-# local_strategy=COPY avoids symlinking into savedir, which fails on Windows
-# without admin rights or Developer Mode enabled.
-MODEL = EncoderClassifier.from_hparams(
-    source="speechbrain/spkrec-ecapa-voxceleb",
-    savedir="pretrained_models/spkrec-ecapa-voxceleb",
-    run_opts={"device": "cpu"},  # Use CPU for demo; change to "cuda" if GPU available
-    local_strategy=LocalStrategy.COPY,
-)
+# Model paths
+_LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "sv"
+_HF_MODEL_NAME = "speechbrain/spkrec-ecapa-voxceleb"
+_SAVEDIR = "pretrained_models/spkrec-ecapa-voxceleb"
+
+# Device selection
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def _load_model() -> EncoderClassifier:
+    """Load SV model from local or HuggingFace."""
+    # Try local model first
+    if _LOCAL_MODEL_PATH.exists() and (_LOCAL_MODEL_PATH / "hyperparams.yaml").exists():
+        try:
+            print(f"Loading SV model from local: {_LOCAL_MODEL_PATH}")
+            model = EncoderClassifier.from_hparams(
+                source=str(_LOCAL_MODEL_PATH),
+                savedir=str(_LOCAL_MODEL_PATH),
+                run_opts={"device": _DEVICE},
+                local_strategy=LocalStrategy.COPY,
+            )
+            print(f"Successfully loaded local SV model (device={_DEVICE})")
+            return model
+        except Exception as e:
+            print(f"Failed to load local SV model: {e}")
+            print("Falling back to HuggingFace...")
+
+    # Fall back to HuggingFace
+    print(f"Loading SV model from HuggingFace: {_HF_MODEL_NAME}")
+    model = EncoderClassifier.from_hparams(
+        source=_HF_MODEL_NAME,
+        savedir=_SAVEDIR,
+        run_opts={"device": _DEVICE},
+        local_strategy=LocalStrategy.COPY,
+    )
+    print(f"Successfully loaded HuggingFace SV model (device={_DEVICE})")
+    return model
+
+
+# Load model once at module import
+MODEL = _load_model()
 
 
 def _load_audio(audio_bytes: bytes) -> torch.Tensor:

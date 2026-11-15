@@ -1,10 +1,13 @@
 """
 Layer 2 — Deepfake Detection - Nandan
-Uses garystafford/wav2vec2-deepfake-voice-detector for spoof detection
+Uses Wav2Vec2 fine-tuned for deepfake/spoof detection
+Labels: {0: 'real', 1: 'fake'}
 Note: Modern high-quality TTS (ElevenLabs, etc.) may evade detection
 """
 
 import io
+import os
+from pathlib import Path
 
 import numpy as np
 import soundfile as sf
@@ -12,11 +15,21 @@ import torch
 from scipy import signal
 from transformers import AutoFeatureExtractor, AutoModelForAudioClassification
 
-# Model: garystafford/wav2vec2-deepfake-voice-detector
-# Labels: {0: 'real', 1: 'fake'}
+# Model paths - local model takes priority over HuggingFace
 _MODEL = None
 _FEATURE_EXTRACTOR = None
-_MODEL_NAME = "garystafford/wav2vec2-deepfake-voice-detector"
+
+# Local model path (relative to backend/)
+_LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "ad"
+# Fallback to HuggingFace if local not available
+_HF_MODEL_NAME = "garystafford/wav2vec2-deepfake-voice-detector"
+
+
+def _get_model_path() -> str:
+    """Get model path - local if exists, else HuggingFace."""
+    if _LOCAL_MODEL_PATH.exists() and (_LOCAL_MODEL_PATH / "config.json").exists():
+        return str(_LOCAL_MODEL_PATH)
+    return _HF_MODEL_NAME
 
 
 def _load_model():
@@ -26,15 +39,20 @@ def _load_model():
     if _MODEL is not None:
         return
 
-    print(f"Loading model: {_MODEL_NAME}")
-    _MODEL = AutoModelForAudioClassification.from_pretrained(_MODEL_NAME)
-    _FEATURE_EXTRACTOR = AutoFeatureExtractor.from_pretrained(_MODEL_NAME)
+    model_path = _get_model_path()
+    is_local = model_path.startswith(str(_LOCAL_MODEL_PATH.parent))
+    source = "local" if is_local else "HuggingFace"
+
+    print(f"Loading AD model from {source}: {model_path}")
+    _MODEL = AutoModelForAudioClassification.from_pretrained(model_path, local_files_only=is_local)
+    _FEATURE_EXTRACTOR = AutoFeatureExtractor.from_pretrained(model_path, local_files_only=is_local)
     _MODEL.eval()
-    print(f"Successfully loaded: {_MODEL_NAME}")
+    print(f"Successfully loaded AD model")
     print(f"Labels: {_MODEL.config.id2label}")
 
     if torch.cuda.is_available():
         _MODEL = _MODEL.to("cuda")
+        print("AD model moved to CUDA")
 
 
 def _load_audio(audio_bytes: bytes) -> np.ndarray:
