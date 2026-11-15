@@ -1,30 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createChallenge, verifyVoice } from '../services/api.js'
+import { createChallenge, createCaptureGrant, getAPIBaseURL } from '../services/api.js'
 import RiskPanel from '../components/RiskPanel.jsx'
 
 /**
  * Banking Shield Voice Verification Page
  *
  * Voice authentication for high-risk actions.
- * Uses AAA-controlled capture component.
+ *
+ * ARCHITECTURE (per HOST_APPS.md):
+ * - Host app (Banking Shield) NEVER handles raw audio directly
+ * - AAA-controlled capture component records and uploads audio directly to AAA
+ * - Host app embeds the capture component via iframe
+ * - Communication via postMessage with origin validation
+ * - Host receives only safe status information (decision, risk_level, reason_public)
  */
 
 function Verification({ user, onLogout }) {
   const navigate = useNavigate()
-  const [step, setStep] = useState('challenge') // challenge, recording, result
+  const [step, setStep] = useState('loading') // loading, capture, result
   const [challenge, setChallenge] = useState(null)
-  const [isRecording, setIsRecording] = useState(false)
+  const [captureGrant, setCaptureGrant] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [countdown, setCountdown] = useState(90)
   const [pendingTransfer, setPendingTransfer] = useState(null)
+  const [captureStatus, setCaptureStatus] = useState('')
 
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef = useRef([])
-  const streamRef = useRef(null)
-  const countdownRef = useRef(null)
+  const iframeRef = useRef(null)
+  const API_BASE = getAPIBaseURL()
 
   // Load pending transfer context
   useEffect(() => {
@@ -34,141 +38,117 @@ function Verification({ user, onLogout }) {
     }
   }, [])
 
-  // Initialize challenge
+  // Initialize challenge and capture grant
   useEffect(() => {
-    async function initChallenge() {
+    async function initCaptureSession() {
       setLoading(true)
       try {
+        // Step 1: Create challenge
         const ch = await createChallenge(
           user.userRef,
           pendingTransfer ? 'high_risk_transaction' : 'standard_verification'
         )
         setChallenge(ch)
-        startCountdown(ch.ttl_seconds || 90)
+
+        // Step 2: Create capture grant for AAA-controlled recording
+        const grant = await createCaptureGrant(
+          user.userRef,
+          ch.challenge_id || ch.token
+        )
+        setCaptureGrant(grant)
+
+        setStep('capture')
       } catch (err) {
-        setError('Failed to create challenge: ' + err.message)
+        setError('Failed to initialize verification: ' + err.message)
       }
       setLoading(false)
     }
-    initChallenge()
-
-    return () => {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current)
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-    }
+    initCaptureSession()
   }, [user.userRef])
 
-  const startCountdown = (seconds) => {
-    setCountdown(seconds)
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current)
-          setError('Challenge expired. Please try again.')
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
+  // Listen for messages from AAA capture component
+  useEffect(() => {
+    function handleCaptureMessage(event) {
+      // In production, validate event.origin against known AAA origins
+      const data = event.data
+      if (!data || data.source !== 'aaa-capture') return
 
-  const startRecording = async () => {
-    setError('')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
+      switch (data.type) {
+        case 'ready':
+          setCaptureStatus('Ready to record')
+          break
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      })
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
+        case 'recording_started':
+          setCaptureStatus('Recording...')
+          break
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
-        }
+        case 'recording_stopped':
+          setCaptureStatus('Processing...')
+          break
+
+        case 'verification_complete':
+          // AAA capture component completed verification
+          // We receive only safe info: decision, reason_public, risk_level
+          setResult({
+            decision: data.decision,
+            reason: data.reason_public,
+            reason_public: data.reason_public,
+            risk_level: data.risk_level,
+            session_id: data.session_id,
+            requires_fresh_challenge: data.requires_fresh_challenge,
+            requires_human_review: data.requires_human_review
+          })
+          setStep('result')
+
+          // If approved and there's a pending transfer, complete it
+          if (data.decision === 'APPROVE' && pendingTransfer) {
+            sessionStorage.removeItem('pendingTransfer')
+          }
+          break
+
+        case 'expired':
+          setError('Session expired. Please try again.')
+          break
+
+        case 'error':
+          setError(`Capture error: ${data.error}`)
+          break
+
+        default:
+          break
       }
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await submitVerification(audioBlob)
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-      setStep('recording')
-
-      // Auto-stop after 6 seconds
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          stopRecording()
-        }
-      }, 6000)
-    } catch (err) {
-      setError('Microphone access denied. Please allow microphone access.')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-    }
-  }
-
-  const submitVerification = async (audioBlob) => {
-    setLoading(true)
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current)
     }
 
-    try {
-      const verifyResult = await verifyVoice(
-        user.userRef,
-        challenge.challenge_id || challenge.token,
-        audioBlob
-      )
-
-      setResult(verifyResult)
-      setStep('result')
-
-      // If approved and there's a pending transfer, complete it
-      if (verifyResult.decision === 'APPROVE' && pendingTransfer) {
-        sessionStorage.removeItem('pendingTransfer')
-      }
-    } catch (err) {
-      setError('Verification failed: ' + err.message)
-      setResult({
-        decision: 'DENY',
-        reason: err.message,
-        risk_level: 'HIGH'
-      })
-      setStep('result')
-    }
-    setLoading(false)
-  }
+    window.addEventListener('message', handleCaptureMessage)
+    return () => window.removeEventListener('message', handleCaptureMessage)
+  }, [pendingTransfer])
 
   const handleRetry = async () => {
-    setStep('challenge')
+    setStep('loading')
     setResult(null)
     setError('')
+    setCaptureStatus('')
     setLoading(true)
     try {
       const ch = await createChallenge(user.userRef, 'standard_verification')
       setChallenge(ch)
-      startCountdown(ch.ttl_seconds || 90)
+      const grant = await createCaptureGrant(
+        user.userRef,
+        ch.challenge_id || ch.token
+      )
+      setCaptureGrant(grant)
+      setStep('capture')
     } catch (err) {
       setError('Failed to create new challenge: ' + err.message)
     }
     setLoading(false)
+  }
+
+  // Build the capture iframe URL
+  const getCaptureURL = () => {
+    if (!captureGrant) return ''
+    // The capture_url is relative to AAA backend
+    return `${API_BASE}${captureGrant.capture_url}`
   }
 
   return (
@@ -191,56 +171,48 @@ function Verification({ user, onLogout }) {
           </div>
         )}
 
-        {(step === 'challenge' || step === 'recording') && (
+        {/* Loading State */}
+        {step === 'loading' && (
           <div className="card verification-card">
-            <div className="countdown-display">
-              <span className={countdown < 30 ? 'warning' : ''}>
-                Time remaining: {countdown}s
-              </span>
+            <div className="processing">Initializing secure verification...</div>
+          </div>
+        )}
+
+        {/* Capture State - AAA-controlled iframe */}
+        {step === 'capture' && captureGrant && (
+          <div className="card verification-card">
+            <div className="capture-info">
+              <p className="security-badge">
+                <span className="lock-icon">&#x1F510;</span>
+                Secure AAA Voice Capture
+              </p>
+              {captureStatus && <p className="capture-status">{captureStatus}</p>}
             </div>
 
-            <div className="challenge-display">
-              <h2>Please say:</h2>
-              <div className="challenge-phrase">
-                "{challenge?.phrase || 'Loading...'}"
-              </div>
-            </div>
-
-            <div className="recording-controls">
-              {isRecording ? (
-                <div className="recording-active">
-                  <div className="recording-indicator">
-                    <span className="pulse"></span>
-                    Recording...
-                  </div>
-                  <button className="btn-stop" onClick={stopRecording}>
-                    Stop Recording
-                  </button>
-                </div>
-              ) : loading ? (
-                <div className="processing">Processing...</div>
-              ) : (
-                <button
-                  className="btn-record large"
-                  onClick={startRecording}
-                  disabled={!challenge || countdown === 0}
-                >
-                  &#x1F3A4; Start Recording
-                </button>
-              )}
+            {/* AAA-controlled capture component embedded via iframe */}
+            <div className="aaa-capture-container">
+              <iframe
+                ref={iframeRef}
+                src={getCaptureURL()}
+                title="AAA Voice Capture"
+                className="aaa-capture-iframe"
+                allow="microphone"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+              />
             </div>
 
             {error && <div className="error-message">{error}</div>}
 
             <div className="verification-info">
               <p>
-                Speak the phrase above clearly. Your voice will be verified against
-                your enrolled voiceprint.
+                Your voice is captured and verified securely by AAA.
+                Audio is not stored or shared with this application.
               </p>
             </div>
           </div>
         )}
 
+        {/* Result State */}
         {step === 'result' && result && (
           <div className="card result-card">
             <RiskPanel
@@ -313,6 +285,51 @@ function Verification({ user, onLogout }) {
           </div>
         )}
       </main>
+
+      <style>{`
+        .aaa-capture-container {
+          width: 100%;
+          max-width: 450px;
+          margin: 20px auto;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #f8fafc;
+        }
+
+        .aaa-capture-iframe {
+          width: 100%;
+          height: 480px;
+          border: none;
+        }
+
+        .security-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #f1f5f9;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 14px;
+          color: #64748b;
+          margin-bottom: 16px;
+        }
+
+        .lock-icon {
+          font-size: 16px;
+        }
+
+        .capture-info {
+          text-align: center;
+          margin-bottom: 16px;
+        }
+
+        .capture-status {
+          color: #3b82f6;
+          font-weight: 500;
+          margin-top: 8px;
+        }
+      `}</style>
     </div>
   )
 }

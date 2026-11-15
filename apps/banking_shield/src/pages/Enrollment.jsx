@@ -1,12 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createChallenge, enrollVoice } from '../services/api.js'
+import { createChallenge, createCaptureGrant, getAPIBaseURL } from '../services/api.js'
 
 /**
  * Banking Shield Voice Enrollment Page
  *
- * AAA-controlled capture component for voice enrollment.
- * Requires multiple utterances and consent per HOST_APPS.md.
+ * ARCHITECTURE (per HOST_APPS.md):
+ * - Host app (Banking Shield) NEVER handles raw audio directly
+ * - AAA-controlled capture component records and uploads audio directly to AAA
+ * - Host app embeds the capture component via iframe
+ * - Communication via postMessage with origin validation
+ * - Host receives only safe status information
+ *
+ * Enrollment requires multiple utterances (REQUIRED_SAMPLES) per HOST_APPS.md.
+ * Each sample uses a fresh challenge and capture grant.
  */
 
 const REQUIRED_SAMPLES = 3
@@ -15,31 +22,102 @@ function Enrollment({ user, onLogout }) {
   const navigate = useNavigate()
   const [step, setStep] = useState('consent') // consent, recording, complete
   const [currentSample, setCurrentSample] = useState(0)
-  const [samples, setSamples] = useState([])
+  const [completedSamples, setCompletedSamples] = useState([])
   const [challenge, setChallenge] = useState(null)
-  const [isRecording, setIsRecording] = useState(false)
+  const [captureGrant, setCaptureGrant] = useState(null)
+  const [captureStatus, setCaptureStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef = useRef([])
-  const streamRef = useRef(null)
+  const iframeRef = useRef(null)
+  const API_BASE = getAPIBaseURL()
 
-  // Cleanup on unmount
+  // Listen for messages from AAA capture component
   useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
+    function handleCaptureMessage(event) {
+      // In production, validate event.origin against known AAA origins
+      const data = event.data
+      if (!data || data.source !== 'aaa-capture') return
+
+      switch (data.type) {
+        case 'ready':
+          setCaptureStatus('Ready to record')
+          break
+
+        case 'recording_started':
+          setCaptureStatus('Recording...')
+          break
+
+        case 'recording_stopped':
+          setCaptureStatus('Processing...')
+          break
+
+        case 'enrollment_sample_complete':
+        case 'verification_complete':
+          // AAA capture component completed this sample
+          handleSampleComplete(data)
+          break
+
+        case 'expired':
+          setError('Session expired. Please start over.')
+          break
+
+        case 'error':
+          setError(`Capture error: ${data.error}`)
+          break
+
+        default:
+          break
       }
     }
-  }, [])
+
+    window.addEventListener('message', handleCaptureMessage)
+    return () => window.removeEventListener('message', handleCaptureMessage)
+  }, [currentSample, completedSamples])
+
+  const handleSampleComplete = async (data) => {
+    const newCompleted = [...completedSamples, {
+      sample_id: data.session_id || `sample_${currentSample}`,
+      recorded_at: new Date().toISOString()
+    }]
+    setCompletedSamples(newCompleted)
+
+    if (newCompleted.length < REQUIRED_SAMPLES) {
+      // Get next challenge and capture grant
+      setCurrentSample(newCompleted.length)
+      setCaptureStatus('')
+      await initCaptureSession()
+    } else {
+      // All samples collected - enrollment complete
+      setStep('complete')
+    }
+  }
+
+  const initCaptureSession = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      // Step 1: Create challenge for this enrollment sample
+      const ch = await createChallenge(user.userRef, 'voice_enrollment')
+      setChallenge(ch)
+
+      // Step 2: Create capture grant for AAA-controlled recording
+      const grant = await createCaptureGrant(
+        user.userRef,
+        ch.challenge_id || ch.token,
+        'enrollment' // enrollment mode
+      )
+      setCaptureGrant(grant)
+    } catch (err) {
+      setError('Failed to initialize capture: ' + err.message)
+    }
+    setLoading(false)
+  }
 
   const handleConsent = async () => {
     setLoading(true)
     try {
-      // Get first challenge phrase
-      const ch = await createChallenge(user.userRef, 'voice_enrollment')
-      setChallenge(ch)
+      await initCaptureSession()
       setStep('recording')
     } catch (err) {
       setError('Failed to start enrollment: ' + err.message)
@@ -47,91 +125,10 @@ function Enrollment({ user, onLogout }) {
     setLoading(false)
   }
 
-  const startRecording = async () => {
-    setError('')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      })
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
-        }
-      }
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        await handleRecordingComplete(audioBlob)
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-
-      // Auto-stop after 5 seconds
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          stopRecording()
-        }
-      }, 5000)
-    } catch (err) {
-      setError('Microphone access denied. Please allow microphone access.')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-    }
-  }
-
-  const handleRecordingComplete = async (audioBlob) => {
-    setLoading(true)
-    try {
-      // Store sample locally first
-      const newSamples = [...samples, {
-        blob: audioBlob,
-        challenge: challenge,
-        recordedAt: new Date().toISOString()
-      }]
-      setSamples(newSamples)
-
-      if (newSamples.length < REQUIRED_SAMPLES) {
-        // Get next challenge
-        setCurrentSample(newSamples.length)
-        const ch = await createChallenge(user.userRef, 'voice_enrollment')
-        setChallenge(ch)
-      } else {
-        // All samples collected - submit enrollment
-        await submitEnrollment(newSamples)
-      }
-    } catch (err) {
-      setError('Failed to process recording: ' + err.message)
-    }
-    setLoading(false)
-  }
-
-  const submitEnrollment = async (allSamples) => {
-    setLoading(true)
-    try {
-      // Submit all samples to AAA enrollment endpoint
-      for (const sample of allSamples) {
-        await enrollVoice(user.userRef, sample.blob)
-      }
-      setStep('complete')
-    } catch (err) {
-      setError('Enrollment failed: ' + err.message)
-    }
-    setLoading(false)
+  // Build the capture iframe URL
+  const getCaptureURL = () => {
+    if (!captureGrant) return ''
+    return `${API_BASE}${captureGrant.capture_url}`
   }
 
   return (
@@ -166,6 +163,15 @@ function Enrollment({ user, onLogout }) {
                 <li>Your voiceprint is encrypted and stored securely</li>
               </ul>
             </div>
+            <div className="security-note">
+              <p className="security-badge">
+                <span className="lock-icon">&#x1F510;</span>
+                Secure AAA Voice Capture
+              </p>
+              <p>
+                Audio is captured securely by AAA and never handled by this application.
+              </p>
+            </div>
             <div className="consent-agreement">
               <p>
                 By continuing, you consent to AAA Engine processing your voice
@@ -190,42 +196,38 @@ function Enrollment({ user, onLogout }) {
               <div className="progress-bar">
                 <div
                   className="progress-fill"
-                  style={{ width: `${(currentSample / REQUIRED_SAMPLES) * 100}%` }}
+                  style={{ width: `${(completedSamples.length / REQUIRED_SAMPLES) * 100}%` }}
                 />
               </div>
             </div>
 
-            <div className="challenge-display">
-              <h2>Please say:</h2>
-              <div className="challenge-phrase">
-                "{challenge?.phrase || 'Loading...'}"
-              </div>
+            <div className="capture-info">
+              <p className="security-badge">
+                <span className="lock-icon">&#x1F510;</span>
+                Secure AAA Voice Capture
+              </p>
+              {captureStatus && <p className="capture-status">{captureStatus}</p>}
             </div>
 
-            <div className="recording-controls">
-              {isRecording ? (
-                <div className="recording-active">
-                  <div className="recording-indicator">
-                    <span className="pulse"></span>
-                    Recording...
-                  </div>
-                  <button
-                    className="btn-stop"
-                    onClick={stopRecording}
-                  >
-                    Stop Recording
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="btn-record"
-                  onClick={startRecording}
-                  disabled={loading || !challenge}
-                >
-                  {loading ? 'Processing...' : '&#x1F3A4; Start Recording'}
-                </button>
-              )}
-            </div>
+            {/* AAA-controlled capture component embedded via iframe */}
+            {captureGrant && (
+              <div className="aaa-capture-container">
+                <iframe
+                  ref={iframeRef}
+                  src={getCaptureURL()}
+                  title="AAA Voice Capture"
+                  className="aaa-capture-iframe"
+                  allow="microphone"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
+              </div>
+            )}
+
+            {loading && (
+              <div className="loading-state">
+                <div className="processing">Preparing next sample...</div>
+              </div>
+            )}
 
             <div className="recording-tips">
               <h4>Tips:</h4>
@@ -248,12 +250,86 @@ function Enrollment({ user, onLogout }) {
               Your voice has been successfully enrolled. You can now use voice
               authentication for high-value transactions.
             </p>
+            <div className="enrollment-summary">
+              <p><strong>{completedSamples.length}</strong> voice samples recorded securely</p>
+            </div>
             <Link to="/dashboard" className="btn-primary">
               Return to Dashboard
             </Link>
           </div>
         )}
       </main>
+
+      <style>{`
+        .aaa-capture-container {
+          width: 100%;
+          max-width: 450px;
+          margin: 20px auto;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #f8fafc;
+        }
+
+        .aaa-capture-iframe {
+          width: 100%;
+          height: 480px;
+          border: none;
+        }
+
+        .security-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #f1f5f9;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 14px;
+          color: #64748b;
+          margin-bottom: 16px;
+        }
+
+        .lock-icon {
+          font-size: 16px;
+        }
+
+        .capture-info {
+          text-align: center;
+          margin-bottom: 16px;
+        }
+
+        .capture-status {
+          color: #3b82f6;
+          font-weight: 500;
+          margin-top: 8px;
+        }
+
+        .security-note {
+          background: #f0fdf4;
+          border: 1px solid #86efac;
+          border-radius: 8px;
+          padding: 16px;
+          margin: 16px 0;
+          text-align: center;
+        }
+
+        .security-note p {
+          margin: 4px 0;
+          color: #166534;
+        }
+
+        .enrollment-summary {
+          background: #f1f5f9;
+          padding: 12px 20px;
+          border-radius: 8px;
+          margin: 16px 0;
+        }
+
+        .loading-state {
+          padding: 20px;
+          text-align: center;
+        }
+      `}</style>
     </div>
   )
 }

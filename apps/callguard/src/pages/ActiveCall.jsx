@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import RiskPanel from '../components/RiskPanel';
 import EscalationPanel from '../components/EscalationPanel';
 import AuditHistory from '../components/AuditHistory';
-import { createChallenge, analyzeTranscriptRisk } from '../services/api';
+import { createChallenge, createCaptureGrant, getAPIBaseURL, analyzeTranscriptRisk } from '../services/api';
 
 /**
  * ActiveCall Page
- * 
+ *
  * Interactive Console for managing an in-flight simulated call.
  * Integrates AAA phrase challenge workflow and AAA-VR vishing defense.
+ *
+ * ARCHITECTURE (per HOST_APPS.md):
+ * - CallGuard NEVER handles raw audio directly
+ * - AAA-controlled capture component records and uploads audio directly to AAA
+ * - Host app embeds the capture component via iframe when real verification needed
+ * - Simulation buttons provided for demo purposes
  */
 export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAddAuditLog, allAuditLogs }) {
   const [elapsed, setElapsed] = useState(call.duration || 60);
   const [challengeSession, setChallengeSession] = useState(null);
+  const [captureGrant, setCaptureGrant] = useState(null);
   const [isRequestingChallenge, setIsRequestingChallenge] = useState(false);
   const [verificationOutcome, setVerificationOutcome] = useState(null);
   const [riskData, setRiskData] = useState(null);
   const [isAnalyzingRisk, setIsAnalyzingRisk] = useState(false);
+  const [showCaptureModal, setShowCaptureModal] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState('');
+
+  const iframeRef = useRef(null);
+  const API_BASE = getAPIBaseURL();
 
   // Timer simulation
   useEffect(() => {
@@ -30,6 +42,86 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
   useEffect(() => {
     handleRunRiskAnalysis();
   }, [call.id]);
+
+  // Listen for messages from AAA capture component
+  useEffect(() => {
+    function handleCaptureMessage(event) {
+      const data = event.data;
+      if (!data || data.source !== 'aaa-capture') return;
+
+      switch (data.type) {
+        case 'ready':
+          setCaptureStatus('Ready - Ask customer to speak the phrase');
+          break;
+
+        case 'recording_started':
+          setCaptureStatus('Recording customer voice...');
+          break;
+
+        case 'recording_stopped':
+          setCaptureStatus('Processing verification...');
+          break;
+
+        case 'verification_complete':
+          // AAA completed verification - we only get safe info
+          const outcome = {
+            decision: data.decision,
+            risk_level: data.risk_level,
+            reason_public: data.reason_public,
+            requestId: data.session_id,
+            details: getOutcomeDetails(data.decision),
+            requires_fresh_challenge: data.requires_fresh_challenge,
+            requires_human_review: data.requires_human_review
+          };
+
+          setVerificationOutcome(outcome);
+          setChallengeSession(null);
+          setCaptureGrant(null);
+          setShowCaptureModal(false);
+          setCaptureStatus('');
+
+          // Record in audit log
+          onAddAuditLog({
+            id: "AUD-" + Math.floor(Math.random() * 9000 + 1000),
+            timestamp: new Date().toISOString(),
+            requestId: data.session_id,
+            customerRef: call.customerRef,
+            tenantId: "callcentre_demo",
+            decision: data.decision,
+            riskLevel: data.risk_level,
+            reasonPublic: data.reason_public,
+            actionTaken: `Voice verification ${data.decision}`
+          });
+          break;
+
+        case 'expired':
+          setCaptureStatus('Session expired');
+          setShowCaptureModal(false);
+          break;
+
+        case 'error':
+          setCaptureStatus(`Error: ${data.error}`);
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    window.addEventListener('message', handleCaptureMessage);
+    return () => window.removeEventListener('message', handleCaptureMessage);
+  }, [call.customerRef, onAddAuditLog]);
+
+  const getOutcomeDetails = (decision) => {
+    const details = {
+      APPROVE: "Exact phrase matched deterministically (OK). Speaker biometric confirmed.",
+      DENY: "Spoken phrase mismatch or speaker verification failed.",
+      STEP_UP: "Additional verification required. Please request a fresh challenge.",
+      REVIEW: "Human review required. Transaction hold applied pending supervisor approval.",
+      UNAVAILABLE: "Authentication service temporarily unavailable. Please try again later."
+    };
+    return details[decision] || "Unknown outcome.";
+  };
 
   const handleRunRiskAnalysis = async () => {
     setIsAnalyzingRisk(true);
@@ -47,9 +139,13 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
     setIsRequestingChallenge(true);
     setVerificationOutcome(null);
     try {
-      // Calls POST /v1/challenges
+      // Step 1: Create challenge
       const session = await createChallenge(call.customerRef, "callguard_high_risk_verification");
       setChallengeSession(session);
+
+      // Step 2: Create capture grant for AAA-controlled recording
+      const grant = await createCaptureGrant(call.customerRef, session.challenge_id || session.token);
+      setCaptureGrant(grant);
     } catch (err) {
       alert("Failed to create challenge: " + err.message);
     } finally {
@@ -57,20 +153,16 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
     }
   };
 
+  const handleLaunchCapture = () => {
+    setShowCaptureModal(true);
+    setCaptureStatus('Initializing secure capture...');
+  };
+
   /**
-   * Simulate customer voice verification response.
-   * Maps to one of FIVE approved decisions per SYSTEM.md §6:
-   * - APPROVE: All gates pass
-   * - DENY: Authentication fails
-   * - STEP_UP: Additional verification needed
-   * - REVIEW: Human review required
-   * - UNAVAILABLE: Service unavailable
+   * Simulate customer voice verification response (for demo purposes only).
+   * In production, real verification goes through AAA capture component.
    */
   const handleSimulateCustomerResponse = (outcomeType = 'APPROVE') => {
-    // In approved AAA architecture:
-    // User speaks phrase into AAA-controlled capture component.
-    // Component uploads directly to AAA POST /v1/verify.
-    // Host backend queries final safe decision.
     const requestId = "req_" + Math.random().toString(36).substring(2, 10);
 
     const outcomes = {
@@ -112,14 +204,15 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
 
     setVerificationOutcome(outcome);
     setChallengeSession(null);
+    setCaptureGrant(null);
 
     // Record in audit log
     const actionMessages = {
-      APPROVE: "Voice verification APPROVED",
-      DENY: "Voice verification DENIED - Prompt Escalation",
-      STEP_UP: "Voice verification STEP_UP - Fresh challenge required",
-      REVIEW: "Voice verification REVIEW - Human review pending",
-      UNAVAILABLE: "Voice verification UNAVAILABLE - Service error"
+      APPROVE: "Voice verification APPROVED (simulated)",
+      DENY: "Voice verification DENIED (simulated)",
+      STEP_UP: "Voice verification STEP_UP (simulated)",
+      REVIEW: "Voice verification REVIEW (simulated)",
+      UNAVAILABLE: "Voice verification UNAVAILABLE (simulated)"
     };
 
     onAddAuditLog({
@@ -135,6 +228,11 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
     });
   };
 
+  const getCaptureURL = () => {
+    if (!captureGrant) return '';
+    return `${API_BASE}${captureGrant.capture_url}`;
+  };
+
   const formatTime = (secs) => {
     const mins = Math.floor(secs / 60);
     const rem = secs % 60;
@@ -145,10 +243,39 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
 
   return (
     <div className="container">
+      {/* AAA Capture Modal */}
+      {showCaptureModal && captureGrant && (
+        <div className="capture-modal-overlay">
+          <div className="capture-modal">
+            <div className="capture-modal-header">
+              <h3>AAA Secure Voice Capture</h3>
+              <button className="close-btn" onClick={() => setShowCaptureModal(false)}>&times;</button>
+            </div>
+            <div className="capture-modal-body">
+              <p className="capture-instruction">
+                Direct the customer to speak the challenge phrase into their device.
+                Audio is captured securely by AAA - never through CallGuard.
+              </p>
+              {captureStatus && <p className="capture-status">{captureStatus}</p>}
+              <div className="aaa-capture-container">
+                <iframe
+                  ref={iframeRef}
+                  src={getCaptureURL()}
+                  title="AAA Voice Capture"
+                  className="aaa-capture-iframe"
+                  allow="microphone"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button className="btn btn-secondary" onClick={onBackToDashboard}>
-          ← Return to Call Queue
+          &larr; Return to Call Queue
         </button>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <span className="badge badge-blue">CHANNEL: {call.channel}</span>
@@ -189,8 +316,8 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
 
             <div className="transcript-box">
               {call.transcript.map(seg => (
-                <div 
-                  key={seg.id} 
+                <div
+                  key={seg.id}
                   className={`message-bubble ${seg.speaker === 'agent' ? 'bubble-agent' : 'bubble-caller'}`}
                 >
                   <div className="bubble-header">
@@ -211,13 +338,13 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
             </div>
 
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              High-value operations require step-up biometric verification. AAA generates a single-use 
-              unpredictable phrase (TTL: 90s). The customer speaks into the AAA-controlled capture component, 
+              High-value operations require step-up biometric verification. AAA generates a single-use
+              unpredictable phrase (TTL: 90s). The customer speaks into the AAA-controlled capture component,
               which uploads directly to AAA for exact-match phrase verification.
             </p>
 
             {!challengeSession && !verificationOutcome && (
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleInitiateVerification}
                 disabled={isRequestingChallenge}
@@ -244,42 +371,63 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
                 </div>
 
                 <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  🔒 <strong>Direct Upload Guardrail:</strong> AAA capture component streams audio straight to <code>{challengeSession.capture.upload_url}</code> using short-lived capture grant. CallGuard never proxies raw audio.
+                  &#x1F512; <strong>Direct Upload Guardrail:</strong> AAA capture component streams audio straight to AAA. CallGuard never proxies raw audio.
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleSimulateCustomerResponse('APPROVE')}
-                  >
-                    ✓ APPROVE
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleSimulateCustomerResponse('DENY')}
-                  >
-                    ✗ DENY
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: '#f97316', color: 'white' }}
-                    onClick={() => handleSimulateCustomerResponse('STEP_UP')}
-                  >
-                    ↻ STEP_UP
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: '#eab308', color: 'black' }}
-                    onClick={() => handleSimulateCustomerResponse('REVIEW')}
-                  >
-                    👁 REVIEW
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleSimulateCustomerResponse('UNAVAILABLE')}
-                  >
-                    ⚠ UNAVAILABLE
-                  </button>
+                {/* AAA Capture Launch Button */}
+                {captureGrant && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleLaunchCapture}
+                      style={{ background: '#059669', width: '100%' }}
+                    >
+                      &#x1F3A4; Launch AAA Capture Component (Real Verification)
+                    </button>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'center' }}>
+                      Opens secure AAA capture for customer voice recording
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '8px' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    <strong>Demo Simulation:</strong> Use buttons below to simulate verification outcomes
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleSimulateCustomerResponse('APPROVE')}
+                    >
+                      &#x2713; APPROVE
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleSimulateCustomerResponse('DENY')}
+                    >
+                      &#x2717; DENY
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#f97316', color: 'white' }}
+                      onClick={() => handleSimulateCustomerResponse('STEP_UP')}
+                    >
+                      &#x21BB; STEP_UP
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#eab308', color: 'black' }}
+                      onClick={() => handleSimulateCustomerResponse('REVIEW')}
+                    >
+                      &#x1F441; REVIEW
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleSimulateCustomerResponse('UNAVAILABLE')}
+                    >
+                      &#x26A0; UNAVAILABLE
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -331,12 +479,12 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
                 </div>
                 {verificationOutcome.requires_fresh_challenge && (
                   <div style={{ fontSize: '0.8rem', color: '#f97316', marginTop: '6px', fontStyle: 'italic' }}>
-                    ↻ A fresh challenge is required. Click "Initiate Customer Voice Verification" to retry.
+                    &#x21BB; A fresh challenge is required. Click "Initiate Customer Voice Verification" to retry.
                   </div>
                 )}
                 {verificationOutcome.requires_human_review && (
                   <div style={{ fontSize: '0.8rem', color: '#eab308', marginTop: '6px', fontStyle: 'italic' }}>
-                    👁 Human review pending. Supervisor will be notified.
+                    &#x1F441; Human review pending. Supervisor will be notified.
                   </div>
                 )}
                 <button
@@ -353,13 +501,13 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
 
         {/* Right Column: Vishing Risk & Escalation Panels */}
         <div>
-          <RiskPanel 
-            riskData={riskData} 
+          <RiskPanel
+            riskData={riskData}
             onReevaluate={handleRunRiskAnalysis}
             isAnalyzing={isAnalyzingRisk}
           />
 
-          <EscalationPanel 
+          <EscalationPanel
             callId={call.id}
             customerRef={call.customerRef}
             initialStatus={call.riskLevel === 'HIGH' ? 'ESCALATED_PENDING_SUPERVISOR' : 'NORMAL'}
@@ -368,6 +516,88 @@ export default function ActiveCall({ call, onBackToDashboard, onUpdateCall, onAd
           <AuditHistory logs={callLogs} />
         </div>
       </div>
+
+      {/* Styles for capture modal */}
+      <style>{`
+        .capture-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.8);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .capture-modal {
+          background: var(--bg-card, #1e293b);
+          border-radius: 12px;
+          width: 90%;
+          max-width: 500px;
+          max-height: 90vh;
+          overflow: hidden;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .capture-modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--border, #334155);
+        }
+
+        .capture-modal-header h3 {
+          margin: 0;
+          color: var(--text-main, #f1f5f9);
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          color: var(--text-muted, #94a3b8);
+          font-size: 24px;
+          cursor: pointer;
+          padding: 0 8px;
+        }
+
+        .close-btn:hover {
+          color: var(--text-main, #f1f5f9);
+        }
+
+        .capture-modal-body {
+          padding: 20px;
+        }
+
+        .capture-instruction {
+          font-size: 0.9rem;
+          color: var(--text-muted, #94a3b8);
+          margin-bottom: 12px;
+        }
+
+        .capture-status {
+          color: #3b82f6;
+          font-weight: 500;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+
+        .aaa-capture-container {
+          border: 1px solid var(--border, #334155);
+          border-radius: 8px;
+          overflow: hidden;
+          background: #f8fafc;
+        }
+
+        .aaa-capture-iframe {
+          width: 100%;
+          height: 450px;
+          border: none;
+        }
+      `}</style>
     </div>
   );
 }

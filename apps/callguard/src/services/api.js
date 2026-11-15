@@ -351,3 +351,42 @@ export async function checkAAAHealth() {
   const res = await fetch(`${API_BASE}/v1/ready`);
   return await res.json();
 }
+
+/**
+ * Create a capture grant for AAA-controlled audio capture.
+ * The host backend calls this, then passes the capture_url to the AAA capture component.
+ * Audio is recorded and uploaded directly to AAA - never through the host app.
+ *
+ * Calls POST /v1/capture/grants
+ */
+export async function createCaptureGrant(userId, challengeId) {
+  if (USE_MOCK) {
+    const mockGrantId = "grant_mock_" + Math.random().toString(36).substring(2, 10);
+    const mockSig = "mock_sig_" + Math.random().toString(36).substring(2, 10);
+    return {
+      grant_id: mockGrantId,
+      capture_url: `/static/capture/index.html?grant=${mockGrantId}&sig=${mockSig}`,
+      expires_at: new Date(Date.now() + 90000).toISOString(),
+      ttl_seconds: 90,
+      _mock: true
+    };
+  }
+
+  const res = await fetch(`${API_BASE}/v1/capture/grants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: userId,
+      challenge_id: challengeId
+    })
+  });
+  if (!res.ok) throw new Error(`Failed to create capture grant: ${res.statusText}`);
+  return await res.json();
+}
+
+/**
+ * Get the base URL for the AAA API (used for iframe src).
+ */
+export function getAPIBaseURL() {
+  return API_BASE;
+}
