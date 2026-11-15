@@ -54,25 +54,42 @@ class GUID(TypeDecorator):
 
 
 class JSONEncodedList(TypeDecorator):
-    """Stores a list as a JSON-encoded string.
-    Works with both SQLite and PostgreSQL.
+    """Stores a float list - PostgreSQL ARRAY(REAL) or SQLite JSON TEXT.
+
+    The Supabase table uses real[] (PostgreSQL array) for embeddings.
+    SQLite uses JSON-encoded TEXT since it doesn't support arrays.
     """
 
     impl = Text
     cache_ok = True
 
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import ARRAY
+            from sqlalchemy import REAL
+            return dialect.type_descriptor(ARRAY(REAL))
+        else:
+            return dialect.type_descriptor(Text())
+
     def process_bind_param(self, value, dialect):
-        if value is not None:
+        if value is None:
+            return None
+        if dialect.name == "postgresql":
+            # PostgreSQL ARRAY - ensure it's a proper list of floats
+            if isinstance(value, str):
+                value = json.loads(value)
+            return [float(x) for x in value]
+        else:
+            # SQLite needs JSON string
             return json.dumps(value)
-        return value
 
     def process_result_value(self, value, dialect):
-        if value is not None:
-            # PostgreSQL JSONB returns native Python objects, not strings
-            if isinstance(value, (list, dict)):
-                return value
-            return json.loads(value)
-        return value
+        if value is None:
+            return None
+        # PostgreSQL ARRAY or SQLite JSON
+        if isinstance(value, (list, tuple)):
+            return [float(x) for x in value]
+        return json.loads(value)
 
 
 class User(Base):

@@ -374,6 +374,8 @@ def configure_cors(app: Any) -> None:
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True if allowed_origins else False,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID", "X-Capture-Grant"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allow_headers=["*"],  # Allow all headers for compatibility
+        expose_headers=["X-Request-ID"],
+        max_age=600,
     )
