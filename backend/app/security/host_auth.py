@@ -95,7 +95,9 @@ def evaluate_banking_decision(
     settings = get_settings()
     base_threshold = settings.L1_SIMILARITY_THRESHOLD
 
-    if is_spoof or spoof_confidence > 0.5:
+    # Only check is_spoof flag - the L2 gate already evaluated spoof_confidence
+    # against its own threshold (L2_SPOOF_THRESHOLD = 0.7)
+    if is_spoof:
         return Decision.DENY, False
 
     # Stricter similarity thresholds for high-value transactions
