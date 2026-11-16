@@ -459,7 +459,7 @@ async def verify(
         )
 
     # === GATE 4: Token Verification ===
-    if not verify_token(token):
+    if not verify_token(token, db):
         log = AuthLog(
             user_id=uuid.UUID(user_id),
             l2_label=l2_label,
