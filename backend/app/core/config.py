@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Thresholds (configurable via environment)
     L2_SPOOF_THRESHOLD: float = 0.7  # Raised to reduce false positives (was 0.5)
-    L1_SIMILARITY_THRESHOLD: float = 0.5
+    L1_SIMILARITY_THRESHOLD: float = 0.35  # Lowered to reduce false rejections (was 0.5)
     ASR_PHRASE_THRESHOLD: float = 0.6
 
     # Challenge Configuration
