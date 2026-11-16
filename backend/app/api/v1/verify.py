@@ -277,9 +277,11 @@ async def verify_authentication(
 
             policy_input.sv_available = True
             policy_input.sv_score = l1_score
-            policy_input.sv_threshold = settings.L1_SIMILARITY_THRESHOLD
+            # Get fresh settings to ensure threshold changes are picked up
+            current_settings = get_settings()
+            policy_input.sv_threshold = current_settings.L1_SIMILARITY_THRESHOLD
 
-            if l1_score >= settings.L1_SIMILARITY_THRESHOLD:
+            if l1_score >= current_settings.L1_SIMILARITY_THRESHOLD:
                 policy_input.sv_result = GateResult.PASS
             else:
                 policy_input.sv_result = GateResult.FAIL
