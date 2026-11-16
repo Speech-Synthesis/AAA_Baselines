@@ -64,11 +64,23 @@ class VoiceprintEncryptor:
         Returns:
             Tuple[bytes, bytes]: (ciphertext, 12-byte random nonce)
         """
-        if not embedding or not isinstance(embedding, list):
+        # Handle both lists and numpy arrays
+        import numpy as np
+        if embedding is None:
+            raise ValueError("Embedding must be a non-empty list of floats")
+        if isinstance(embedding, np.ndarray):
+            if embedding.size == 0:
+                raise ValueError("Embedding must be a non-empty list of floats")
+            embedding_list = embedding.tolist()
+        elif isinstance(embedding, list):
+            if len(embedding) == 0:
+                raise ValueError("Embedding must be a non-empty list of floats")
+            embedding_list = embedding
+        else:
             raise ValueError("Embedding must be a non-empty list of floats")
 
         nonce = os.urandom(NONCE_SIZE_BYTES)
-        data = json.dumps(embedding).encode("utf-8")
+        data = json.dumps(embedding_list).encode("utf-8")
         ciphertext = self._aesgcm.encrypt(nonce, data, associated_data)
         return ciphertext, nonce
 
