@@ -265,9 +265,12 @@ async def verify_authentication(
 
     if policy_input.ad_result == GateResult.PASS and policy_input.asr_result == GateResult.PASS:
         try:
-            stored_embedding = decrypt_embedding(
-                voiceprint.embedding, tenant_id=tenant_id, user_id=user_id
-            )
+            # Get embedding (may be list or encrypted string)
+            stored_embedding = voiceprint.embedding
+            if isinstance(stored_embedding, str):
+                stored_embedding = decrypt_embedding(
+                    stored_embedding, tenant_id=tenant_id, user_id=user_id
+                )
             l1_result = await _run_in_executor(verify_speaker, audio_bytes, stored_embedding)
             l1_score = l1_result["score"]
             new_embedding = l1_result["embedding"]
@@ -308,13 +311,15 @@ async def verify_authentication(
 
             # Update voiceprint with EMA
             if new_embedding is not None:
-                stored_embedding = decrypt_embedding(
-                    voiceprint.embedding, tenant_id=tenant_id, user_id=user_id
-                )
+                # Get existing embedding (may be list or encrypted string)
+                stored_embedding = voiceprint.embedding
+                if isinstance(stored_embedding, str):
+                    stored_embedding = decrypt_embedding(
+                        stored_embedding, tenant_id=tenant_id, user_id=user_id
+                    )
                 updated_embedding = update_voiceprint(stored_embedding, new_embedding)
-                voiceprint.embedding = encrypt_embedding(
-                    updated_embedding, tenant_id=tenant_id, user_id=user_id
-                )
+                # Store as list (JSONEncodedList handles serialization)
+                voiceprint.embedding = updated_embedding if isinstance(updated_embedding, list) else updated_embedding.tolist()
                 voiceprint.sample_count += 1
                 voiceprint.updated_at = datetime.utcnow()
 
