@@ -1,15 +1,17 @@
 import axios from 'axios';
 
 // API base URL (Backend FastAPI server)
-// Auto-detect: use localhost in dev, Render backend in production
+// In development: use empty string to leverage Vite proxy (avoids CORS issues)
+// In production: use the deployed backend URL
 const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
+  ? ''  // Empty = use Vite proxy, which handles CORS
   : 'https://aaa-backend.onrender.com';
 
 // Configure Axios client with timeout (60s for model loading on first request)
 const client = axios.create({
   baseURL: API_BASE,
   timeout: 60000,
+  withCredentials: false,  // Don't send credentials to avoid CORS preflight complexity
 });
 
 // Backend availability status (updated by checkServerHealth)
