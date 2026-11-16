@@ -90,20 +90,26 @@ def evaluate_banking_decision(
     Evaluates acoustic outputs against Banking Shield policy.
     Ensures raw scores are NEVER leaked; returns only high-level Decision.
     """
+    # Get threshold from config
+    from ..core.config import get_settings
+    settings = get_settings()
+    base_threshold = settings.L1_SIMILARITY_THRESHOLD
+
     if is_spoof or spoof_confidence > 0.5:
         return Decision.DENY, False
 
     # Stricter similarity thresholds for high-value transactions
+    # Scale up from the base threshold
     if policy_tier == BankingShieldPolicy.HIGH_VALUE:
-        min_similarity = 0.82
+        min_similarity = max(base_threshold + 0.25, 0.70)  # Higher for high-value
     elif policy_tier == BankingShieldPolicy.ELEVATED:
-        min_similarity = 0.75
+        min_similarity = max(base_threshold + 0.15, 0.55)  # Medium for elevated
     else:
-        min_similarity = 0.65
+        min_similarity = base_threshold  # Use config threshold for standard
 
     if similarity_score >= min_similarity:
         return Decision.APPROVE, False
-    elif similarity_score >= (min_similarity - 0.15):
+    elif similarity_score >= (min_similarity - 0.10):
         # Marginal similarity requires step-up challenge
         return Decision.STEP_UP, True
     else:
