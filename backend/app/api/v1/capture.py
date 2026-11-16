@@ -20,9 +20,30 @@ from sqlalchemy.orm import Session
 from ...core.config import get_settings
 from ...db import get_db
 from ...models import Challenge, User
-from ...security.jwt_auth import get_current_tenant
+from ...security.jwt_auth import oauth2_scheme
 
 router = APIRouter(prefix="/capture", tags=["capture"])
+
+
+def get_optional_tenant(token: str | None = Depends(oauth2_scheme)) -> str | None:
+    """Optional JWT authentication - returns tenant_id if token provided, None otherwise."""
+    if not token:
+        return None
+    try:
+        from jose import jwt
+
+        from ...security.jwt_auth import JWT_ALGORITHM, JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET
+
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            audience=JWT_AUDIENCE,
+            issuer=JWT_ISSUER,
+        )
+        return payload.get("tenant_id") or payload.get("sub")
+    except Exception:
+        return None
 settings = get_settings()
 
 # In-memory grant store (production would use Redis/DB)
@@ -60,8 +81,9 @@ class CaptureStatus(BaseModel):
 def _generate_grant_signature(grant_id: str, tenant_id: str, challenge_id: str) -> str:
     """Generate HMAC signature for grant verification."""
     message = f"{grant_id}:{tenant_id}:{challenge_id}"
+    secret = settings.L3_HMAC_SECRET or "default-capture-grant-secret"
     return hmac.new(
-        settings.SECRET_KEY.encode(),
+        secret.encode(),
         message.encode(),
         hashlib.sha256
     ).hexdigest()[:32]
@@ -77,7 +99,7 @@ def _generate_grant_signature(grant_id: str, tenant_id: str, challenge_id: str) 
 async def create_capture_grant(
     request: CaptureGrantRequest,
     db: Session = Depends(get_db),
-    tenant_id: str = Depends(get_current_tenant),
+    tenant_id: str | None = Depends(get_optional_tenant),
 ) -> CaptureGrantResponse:
     """
     Create a capture authorization grant.
@@ -120,7 +142,8 @@ async def create_capture_grant(
 
     # Generate grant
     grant_id = secrets.token_urlsafe(32)
-    signature = _generate_grant_signature(grant_id, tenant_id, request.challenge_id)
+    effective_tenant = tenant_id or "default_tenant"
+    signature = _generate_grant_signature(grant_id, effective_tenant, request.challenge_id)
 
     # Grant TTL matches remaining challenge time, max 90s
     remaining_seconds = int((challenge.expires_at - datetime.utcnow()).total_seconds())
@@ -129,7 +152,7 @@ async def create_capture_grant(
 
     # Store grant
     _capture_grants[grant_id] = {
-        "tenant_id": tenant_id,
+        "tenant_id": effective_tenant,
         "user_id": request.user_id,
         "challenge_id": request.challenge_id,
         "phrase": challenge.phrase,
