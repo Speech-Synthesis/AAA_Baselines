@@ -39,7 +39,6 @@ export function Sidebar({ activeTab, setActiveTab, activeUser, isServerLive }) {
           </div>
         </div>
 
-        {/* Collapsible Advanced Navigation */}
         <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-light)' }}>
           <button
             onClick={() => setShowAdvancedNav(!showAdvancedNav)}
