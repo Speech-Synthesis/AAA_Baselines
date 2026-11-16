@@ -36,10 +36,10 @@ class Settings(BaseSettings):
     # Challenge Configuration
     CHALLENGE_TTL_SECONDS: int = 90
 
-    # Rate Limiting
-    RATE_LIMIT_CHALLENGES: str = "10/minute"
-    RATE_LIMIT_VERIFY: str = "5/minute"
-    RATE_LIMIT_ENROLL: str = "3/5minutes"
+    # Rate Limiting (increased for development/testing)
+    RATE_LIMIT_CHALLENGES: str = "60/minute"
+    RATE_LIMIT_VERIFY: str = "30/minute"
+    RATE_LIMIT_ENROLL: str = "30/minute"
 
     # CORS - explicit origins only, no wildcards allowed
     # In production, set this to the actual frontend URLs
